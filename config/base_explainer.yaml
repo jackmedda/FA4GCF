@@ -1,0 +1,118 @@
+# choices ["DPBG", "BaB"]
+explainer: DPBG
+# optimizer for explainer ['SGD', 'AdamW', 'Adadelta']
+cf_optimizer: SGD
+# learning rate of optimizer for explainer
+cf_learning_rate: 10000 # 3000 (deletion) / 65000 (addition) for NDCGApprox, 300 (deletion) for SoftmaxLoss
+# set to update weights after each mini-batch, otherwise after a full batch
+mini_batch_descent: True
+
+momentum: 0.0
+# epochs to generate explanations
+cf_epochs: 800
+# how many users should be considered to explain?
+user_batch_exp: 48
+# loss weight for the graph dist loss
+cf_beta: 0.5  # 0.01 for NDCGApproxLoss, 4.0 for SoftmaxLoss
+# the function used to check if the top-k list was perturbed
+cf_dist: damerau_levenshtein
+# how many top items to consider for model outcome list and explanation loss
+cf_topk: 10
+
+# metric used for demographic parity loss and debugging. choices ["ndcg", "softmax"]
+metric_loss: softmax
+
+# metric to evaluate the performance of the model. choices ["ndcg", "hit", "recall", "mrr", "precision"]
+eval_metric: precision
+
+# metric to evaluate the aspect to explain of the model. choices ["consumer_DP_across_random_samples", "consumer_DP", "provider_DP", "UC"]
+exp_metric: UC
+
+dropout_prob: 0.3
+
+edge_additions: False
+
+# select which set need to be used to optimize the DP explainer. Choices ["rec", "train", "valid", "test"]
+exp_rec_data: "test"
+
+# device: cpu
+
+# "local": the optimization uses the ranking metric score of the disadvantaged group computed locally for the current batch
+# "global": the optimization uses the ranking metric score of the disadvantaged group computed globally on the original model
+only_adv_group: "local"
+# Choose if the edges of the advantaged group should be perturbed or the opposite
+perturb_adv_group: False
+
+# how many edges should be deleted for each batch before passing to the next one when BaB explainer is used
+bab_min_del_edges: 100
+
+bab_max_tries: 450
+
+# Last.FM 1K
+# data_path: 'src/dataset/lastfm-1k' # for Last.FM 1K
+# ML-1M
+# data_path: 'dataset/ml-1m' # for ML-1M
+
+# sensitive attributes to be used in the explanations losses if needed and for following analysis
+sensitive_attribute: gender
+
+#
+item_discriminative_attribute: visibility
+
+# if True each new exp will have a different number of edges from the last one
+save_unique_graph_dist_loss: True
+
+# force return of explanations even though the top-k is not perturbed (only useful for hops analysis)
+explainer_force_return: False
+
+load_col:
+    inter: [user_id, item_id, timestamp]
+    item: [item_id, class]
+    user: [user_id, gender, age]
+
+eval_args:
+    split: {'LRS': None}
+    order: RO  # not relevant
+    group_by: '-'
+    mode: 'full'
+
+# Early stopping parameters
+early_stopping:
+    patience: 15  # a periodicity is visible on the charts, with low peaks better than the previous ones after 20-40 epochs
+    ignore: 0
+    method: 'consistency'
+    mode: 'lt'  # lower than, use any other python func ('le', 'gt', 'ge')
+    delta: 0.001  # several experiments show many low peaks with differences about > 0.15, which are relevant for us
+    check_value: 'exp_loss'  # ['exp_loss', 'exp_metric']
+
+previous_loss_value: False
+previous_batch_LR_scaling: False
+
+# use 'random' to initialize it randomly around a fixed value, otherwise the fixed value will be used
+perturbation_initialization: 'static'
+
+# Policies
+explainer_policies:
+    gradient_deactivation_constraint: True
+    increase_disparity: False
+    force_removed_edges: False  # no effect on edge_additions
+    group_deletion_constraint: False   # this and `random_perturbation` cannot be both True
+    random_perturbation: False
+    neighborhood_perturbation: False   # the perturbation spread from the first perturbed edges towards the neighbors
+    users_zero_constraint: False  # only perturbs users with `eval_metric` <= `users_zero_constraint_value`
+    users_low_degree: False  # only perturbs users with the lowest interaction history based on `users_low_degree_ratio`
+    users_furthest_constraint: False  # only perturbs edges connected to the furthest users (perturbed group) from the non perturbed group
+    sparse_users_constraint: False  # only perturbs edges connected to users connected with niche items
+    items_preference_constraint: False  # only perturbs edges connected to items preferred by the perturbed group
+    niche_items_constraint: False  # only perturbs edges connected to niche items
+
+random_perturbation_p: 0.0001
+users_zero_constraint_value: 0
+users_low_degree_ratio: 0.35  # it represent the ratio of the users with the lowest degree
+users_furthest_constraint_ratio: 0.35  # it represent the ratio of the furthest users from the non perturbed group
+sparse_users_constraint_ratio: 0.35  # it represent the ratio of the users most connected with niche items
+items_preference_constraint_ratio: 0.2  # it represent the ratio of items mostly preferred by the perturbed group
+niche_items_constraint_ratio: 0.2  # it represents the ratio of the most niche items
+
+coverage_min_relevant_items: 0  # how many items should be relevant in a list to be considered "covered"
+coverage_loss_only_relevant: True  # if only relevant items are optimized, or the relevance of non-relevant items should be decreased in the optimization

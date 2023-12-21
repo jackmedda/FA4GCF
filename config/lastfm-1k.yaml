@@ -1,0 +1,30 @@
+epochs: 100
+# 'USER_ID_FIELD': user_id,
+# 'ITEM_ID_FIELD': item_id,
+TIMESTAMP_FIELD: 'timestamp'
+train_batch_size: 4096
+eval_batch_size: 2048
+neg_sampling:
+    uniform: 1
+eval_step: 10
+metrics: ['Recall', 'NDCG', 'MRR', 'Hit']
+topk: 10
+valid_metric: NDCG@10
+metric_decimal_place: 4
+# learning_rate: 0.0001
+# embedding_size: 100 # embedding degli item
+# n_layers: 4
+reg_weight: 1e-05 #[1e-05,1e-04,1e-03,1e-02]
+eval_args:
+    split: {'LRS': None}
+    order: RO  # not relevant
+    group_by: '-'
+    mode: 'full'
+
+data_path: 'dataset'
+
+checkpoint_dir': 'data/models'
+save_dataset': True
+save_dataloaders': True
+seed: 42
+load_col: {'inter': ['user_id', 'item_id', 'timestamp']}
