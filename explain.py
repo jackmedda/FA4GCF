@@ -15,7 +15,8 @@ import pandas as pd
 from recbole.data.dataloader import FullSortEvalDataLoader
 
 import gnnuers.utils as utils
-from gnnuers.explainers import DPBG, BaB
+
+from fa4gcf.perturbation_trainer import PerturbationTrainer
 
 
 script_path = os.path.abspath(os.path.dirname(inspect.getsourcefile(lambda: 0)))
@@ -36,7 +37,7 @@ def get_base_exps_filepath(config,
     """
     epochs = config["cf_epochs"]
     model_name = model_name or config["model"]
-    explainer = config["explainer"].lower()
+    explainer = PerturbationTrainer.__name__
     exp_type = "dp_explanations" if not hyper else "hyperoptimization"
     base_exps_file = os.path.join(script_path, "experiments", exp_type, config["dataset"], model_name, explainer)
 
@@ -87,30 +88,9 @@ def get_base_exps_filepath(config,
     return base_exps_file
 
 
-def save_exps_df(base_exps_file, exps):
+def perturb(config, model, _rec_data, _full_dataset, _train_data, _valid_data, _test_data, base_exps_file, **kwargs):
     """
-    Saves the pandas dataframe representation of explanations
-    :param base_exps_file:
-    :param exps:
-    :return:
-    """
-    data = [exp[:-3] + exp[-2:] for exp_list in exps.values() for exp in exp_list]
-    data = list(map(lambda x: [x[0], *x[1:]], data))
-    df = pd.DataFrame(
-        data,
-        columns=utils.EXPS_COLUMNS[:-3] + utils.EXPS_COLUMNS[-2:]
-    )
-
-    out_path = base_exps_file.split(os.sep)
-    df.to_csv(
-        f'{"_".join(out_path[out_path.index("explanations"):])}.csv',
-        index=False
-    )
-
-
-def explain(config, model, _rec_data, _full_dataset, _train_data, _valid_data, _test_data, base_exps_file, **kwargs):
-    """
-    Function that explains, that is generates perturbed graphs.
+    Function that starts the perturbation process, that is generates perturbed graphs.
     :param config:
     :param model:
     :param _train_dataset:
@@ -142,21 +122,31 @@ def explain(config, model, _rec_data, _full_dataset, _train_data, _valid_data, _
     utils.wandb_init(
         config,
         **wandb_env_data,
-        name="Explanation",
+        name="Perturbation",
         job_type="train",
         group=f"{model.__class__.__name__}_{config['dataset']}_{config['sensitive_attribute'].title()}_epochs{config['cf_epochs']}_exp{os.path.basename(base_exps_file)}",
         mode=wandb_mode
     )
     # wandb.config.update({"exp": os.path.basename(base_exps_file)})
 
-    explainer_model = {
-        "dpbg": DPBG,
-        "bab": BaB
-    }.get(config["explainer"].lower(), DPBG)
-
-    explainer = explainer_model(config, _train_data.dataset, _rec_data, model, dist=config['cf_dist'], **kwargs)
-    explainer.set_checkpoint_path(checkpoint_path)
-    exp, users_order, model_preds = explainer.explain(user_data, _full_dataset, _train_data, _valid_data, _test_data, epochs, topk=topk)
+    perturbation_trainer = PerturbationTrainer(
+        config,
+        _train_data.dataset,
+        _rec_data,
+        model,
+        dist=config['cf_dist'],
+        **kwargs
+    )
+    perturbation_trainer.set_checkpoint_path(checkpoint_path)
+    exp, users_order, model_preds = perturbation_trainer.explain(
+        user_data,
+        _full_dataset,
+        _train_data,
+        _valid_data,
+        _test_data,
+        epochs,
+        topk=topk
+    )
 
     with open(exps_filename, 'wb') as f:
         pickle.dump(exp, f)
@@ -165,10 +155,10 @@ def explain(config, model, _rec_data, _full_dataset, _train_data, _valid_data, _
     with open(model_preds_file, 'wb') as f:
         pickle.dump(model_preds, f)
 
-    logging.getLogger().info(f"Saved explanations at path {base_exps_file}")
+    logging.getLogger().info(f"Saved perturbations at path {base_exps_file}")
 
 
-def optimize_explain(config, model, _train_dataset, _rec_data, _test_data, base_exps_file, **kwargs):
+def optimize_perturbation(config, model, _train_dataset, _rec_data, _test_data, base_exps_file, **kwargs):
     """
     Function that explains, that is generates perturbed graphs.
     :param config:
@@ -186,11 +176,6 @@ def optimize_explain(config, model, _train_dataset, _rec_data, _test_data, base_
 
     user_source = _rec_data if _rec_data is not None else _test_data
     user_data = user_source.user_df[user_source.uid_field][torch.randperm(user_source.user_df.length)]
-
-    explainer_model = {
-        "dpbg": DPBG,
-        "bab": BaB
-    }.get(config["explainer"].lower(), DPBG)
 
     exp_token = f"{model.__class__.__name__}_" + \
                 f"{config['dataset']}_" + \
@@ -218,11 +203,6 @@ def optimize_explain(config, model, _train_dataset, _rec_data, _test_data, base_
 
         # config['dropout_prob'] = trial.suggest_float('dropout_prob', 0, 0.3)
 
-        if config["explainer"].lower() == "bab":
-            config['bab_min_del_edges'] = trial.suggest_int('bab_min_del_edges', 10, 200)
-            config['bab_max_tries'] = trial.suggest_int('bab_max_tries', 50, 400)
-            wandb_config_keys.extend(['bab_min_del_edges', 'bab_max_tries'])
-
         wandb_config = {k: config[k] for k in wandb_config_keys}
 
         run = utils.wandb_init(
@@ -236,8 +216,20 @@ def optimize_explain(config, model, _train_dataset, _rec_data, _test_data, base_
             reinit=True
         )
 
-        explainer = explainer_model(config, _train_dataset, _rec_data, model, dist=config['cf_dist'], **kwargs)
-        exp, model_preds = explainer.explain(user_data, _test_data, epochs, topk=topk)
+        perturbation_trainer = PerturbationTrainer(
+            config,
+            _train_dataset,
+            _rec_data,
+            model,
+            dist=config['cf_dist'],
+            **kwargs
+        )
+        exp, model_preds = perturbation_trainer.explain(
+            user_data,
+            _test_data,
+            epochs,
+            topk=topk
+        )
         best_exp = utils.get_best_exp_early_stopping(exp, config)
 
         exp_metric = best_exp[utils.exp_col_index('exp_metric')]
@@ -285,8 +277,8 @@ def optimize_explain(config, model, _train_dataset, _rec_data, _test_data, base_
         json.dump(dict(trial.params.items()), param_file, indent=4)
 
 
-def execute_explanation(model_file,
-                        base_explainer_config_file,
+def execute_explanation(pre_config,
+                        model_file,
                         explainer_config_file=os.path.join("config", "explainer.yaml"),
                         config_id=-1,
                         verbose=False,
@@ -294,7 +286,7 @@ def execute_explanation(model_file,
                         cmd_config_args=None,
                         hyperoptimization=False,
                         overwrite=False):
-    explainer_config = utils.update_base_explainer(base_explainer_config_file, explainer_config_file)
+    explainer_config = pre_config.get_explainer_config_file(explainer_config_file)
 
     # load trained model, config, dataset
     config, model, dataset, train_data, valid_data, test_data = utils.load_data_and_model(
@@ -346,7 +338,7 @@ def execute_explanation(model_file,
     )
 
     if not hyperoptimization:
-        explain(
+        perturb(
             config,
             model,
             rec_data,
@@ -358,7 +350,7 @@ def execute_explanation(model_file,
             **kwargs
         )
     else:
-        optimize_explain(
+        optimize_perturbation(
             config,
             model,
             train_data.dataset,

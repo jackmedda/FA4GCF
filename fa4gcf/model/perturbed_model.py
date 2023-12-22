@@ -8,12 +8,19 @@ except ImportError:
 import gnnuers.models.utils as model_utils
 
 import fa4gcf.utils as utils
+from fa4gcf.model.general_recommender import (
+    DirectAU,
+    LightGCL
+)
 
 
 class PygPerturbedModel(object):
     def __init__(self, config, model, adv_group=None, filtered_users=None, filtered_items=None):
         self.inner_pyg_model = model
         self.num_all = model.n_users + model.n_items
+
+        if isinstance(self.inner_pyg_model, LightGCL):
+            raise NotImplementedError("Current implementation of LightGCL cannot be perturbed.")
 
         self.n_hops = config['n_hops']
         self.neighbors_hops = config['neighbors_hops']
@@ -134,50 +141,10 @@ class PygPerturbedModel(object):
     def load_cf_state_dict(self, ckpt):
         state_dict = self.state_dict()
         state_dict.update({'P_symm': ckpt['P_symm']})
-        self.load_state_dict(state_dict)
         self.mask_sub_adj = ckpt['mask_sub_adj']
         self.mask_filter = ckpt['mask_filter']
         self.force_removed_edges = ckpt['force_removed_edges']
         self.mask_neighborhood = ckpt['mask_neighborhood']
-
-    def loss(self, output, fair_loss_f, fair_loss_target):
-        """
-
-        :param output: output of the model with perturbed adj matrix
-        :param fair_loss_f: fair loss function
-        :param fair_loss_target: fair loss target
-
-        :return:
-        """
-        # compute fairness loss
-        fair_loss = fair_loss_f(output, fair_loss_target)
-
-        # non-differentiable adj matrix is taken to compute the graph dist loss
-        cf_adj = self.P_loss
-        cf_adj.requires_grad = True  # Need to change this otherwise loss_graph_dist has no gradient
-
-        if self.inner_pyg_model.edge_weight is None:
-            adj = self.inner_pyg_model.edge_index.to(cf_adj.device)
-        else:
-            adj = torch.sparse.FloatTensor(
-                self.inner_pyg_model.edge_index, self.inner_pyg_model.edge_weight, (self.num_all, self.num_all)
-            )
-
-        orig_dist = (cf_adj - adj)
-        if not orig_dist.is_coalesced():
-            orig_dist = orig_dist.coalesce()
-        if self.inner_pyg_model.edge_weight is None:
-            _, _, vals = orig_dist.coo()
-        else:
-            vals = orig_dist.values()
-
-        # compute normalized graph dist loss (logistic sigmoid is not used because reaches too fast 1)
-        orig_loss_graph_dist = torch.sum(vals.abs()) / 2  # Number of edges changed (symmetrical)
-        loss_graph_dist = orig_loss_graph_dist / (1 + abs(orig_loss_graph_dist))  # sigmoid dist
-
-        loss_total = fair_loss + self.beta * loss_graph_dist.to(fair_loss.device)
-
-        return loss_total, orig_loss_graph_dist, loss_graph_dist, fair_loss, orig_dist
 
     def update_neighborhood(self, nodes: torch.Tensor):
         if self.mask_neighborhood is None:
@@ -249,12 +216,71 @@ class PygPerturbedModel(object):
 
         return pert_edge_index, pert_edge_weight
 
-    def forward(self, pred=False):
+    def loss(self, output, fair_loss_f, fair_loss_target):
+        """
+
+        :param output: output of the model with perturbed adj matrix
+        :param fair_loss_f: fair loss function
+        :param fair_loss_target: fair loss target
+
+        :return:
+        """
+        # compute fairness loss
+        fair_loss = fair_loss_f(output, fair_loss_target)
+
+        # non-differentiable adj matrix is taken to compute the graph dist loss
+        cf_adj = self.P_loss
+        cf_adj.requires_grad = True  # Need to change this otherwise loss_graph_dist has no gradient
+
+        if self.inner_pyg_model.edge_weight is None:
+            adj = self.inner_pyg_model.edge_index.to(cf_adj.device)
+        else:
+            adj = torch.sparse.FloatTensor(
+                self.inner_pyg_model.edge_index, self.inner_pyg_model.edge_weight, (self.num_all, self.num_all)
+            )
+
+        orig_dist = (cf_adj - adj)
+        if not orig_dist.is_coalesced():
+            orig_dist = orig_dist.coalesce()
+        if self.inner_pyg_model.edge_weight is None:
+            _, _, vals = orig_dist.coo()
+        else:
+            vals = orig_dist.values()
+
+        # compute normalized graph dist loss (logistic sigmoid is not used because reaches too fast 1)
+        orig_loss_graph_dist = torch.sum(vals.abs()) / 2  # Number of edges changed (symmetrical)
+        loss_graph_dist = orig_loss_graph_dist / (1 + abs(orig_loss_graph_dist))  # sigmoid dist
+
+        loss_total = fair_loss + self.beta * loss_graph_dist.to(fair_loss.device)
+
+        return loss_total, orig_loss_graph_dist, loss_graph_dist, fair_loss, orig_dist
+
+    def forward(self, pred):
         """
         Perturbs the adjacency matrix in a differentiable way. Then, it re-creates the normalized adjacency matrix,
         and updates it for trained GNN model.
 
-        :param pred: if True, the perturbation is discrete, i.e., \hat{p} \in \{0, \1}. Used for inference.
+        :param pred: if True, the perturbation is discrete, i.e., \hat{p} \in \{0, 1\}. Used for inference.
         :return:
         """
-        pert_edge_index, pert_edge_weight = self.perturb_adj_matrix()
+        pert_edge_index, pert_edge_weight = self.perturb_adj_matrix(pred=pred)
+        if isinstance(self.inner_pyg_model, DirectAU):
+            self.inner_pyg_model.edge_index.encoder = pert_edge_index
+            self.inner_pyg_model.edge_weight.decoder = pert_edge_weight
+
+            # the DirectAU forward process simply gets the encoder embeddings, so they must be restored as well
+            self.inner_pyg_model.encoder.restore_user_e, self.inner_pyg_model.encoder.restore_item_e = None, None
+        else:
+            self.inner_pyg_model.edge_index = pert_edge_index
+            self.inner_pyg_model.edge_weight = pert_edge_weight
+
+        if hasattr(self.inner_pyg_model, "restore_user_e") and hasattr(self.inner_pyg_model, "restore_item_e"):
+            self.inner_pyg_model.restore_user_e, self.inner_pyg_model.restore_item_e = None, None
+
+    def predict(self, interaction, pred=False):
+        self.forward(pred=pred)
+        return self.inner_pyg_model.predict(interaction)
+
+    def full_sort_predict(self, interaction, pred=False):
+        self.forward(pred=pred)
+        return self.inner_pyg_model.full_sort_predict(interaction)

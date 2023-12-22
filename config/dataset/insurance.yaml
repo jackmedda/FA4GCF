@@ -1,0 +1,39 @@
+worker: 0
+epochs: 100
+'USER_ID_FIELD': 'client_id'
+'ITEM_ID_FIELD': 'product_id'
+TIMESTAMP_FIELD: 'timestamp'
+train_batch_size: 256
+eval_batch_size: 512
+train_neg_sample_args:          # (dict) Negative sampling configuration for model training.
+  distribution: uniform         # (str) The distribution of negative items.
+  sample_num: 1                 # (int) The sampled num of negative items.
+  alpha: 1.0                    # (float) The power of sampling probability for popularity distribution.
+  dynamic: False                # (bool) Whether to use dynamic negative sampling.
+  candidate_num: 0
+eval_step: 10
+metrics: ['Recall', 'NDCG', 'MRR', 'Hit']
+topk: 10
+valid_metric: NDCG@10
+metric_decimal_place: 4
+# learning_rate: 0.0001
+# embedding_size: 100 # embedding degli item
+# n_layers: 4
+reg_weight: 1e-05 #[1e-05,1e-04,1e-03,1e-02]
+eval_args:
+    split: {'LRS': None}
+    order: RO  # not relevant
+    group_by: '-'
+    mode: 'full'
+
+data_path: 'dataset'
+require_pow: False              # (bool) Whether or not to perform power operation in EmbLoss.
+enable_amp: False               # (bool) Whether or not to use mixed precision training.
+enable_scaler: False            # (bool) Whether or not to use GradScaler in mixed precision training.
+transform: ~                    # (str) The transform operation for batch data process.
+
+checkpoint_dir': 'data/models'
+save_dataset': True
+save_dataloaders': True
+seed: 42
+load_col: {'inter': ['client_id', 'product_id']}

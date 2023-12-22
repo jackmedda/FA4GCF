@@ -8,15 +8,14 @@ import logging
 
 import numpy as np
 import pandas as pd
-from recbole.config import Config
 from recbole.trainer import HyperTuning
-from recbole.data import create_dataset, data_preparation
-from recbole.utils import init_logger, get_model, get_trainer, init_seed, set_color, get_local_time
+from recbole.data import data_preparation
+from recbole.utils import init_logger, init_seed, set_color, get_local_time
 
-from gnnuers.models.ngcf import NGCF
-from gnnuers.data import PerturbedDataset
-from gnnuers.explain import execute_explanation
-import gnnuers.utils as utils
+import fa4gcf.utils as utils
+from fa4gcf.config import Config
+from fa4gcf.data import Dataset, PerturbedDataset
+from explain import execute_explanation
 
 
 def training(_config, saved=True, model_file=None, hyper=False, perturbed_dataset=None):
@@ -29,16 +28,13 @@ def training(_config, saved=True, model_file=None, hyper=False, perturbed_datase
         )
     else:
         # dataset filtering
-        _dataset = perturbed_dataset if perturbed_dataset is not None else create_dataset(_config)
+        _dataset = perturbed_dataset if perturbed_dataset is not None else Dataset(_config)
 
         # dataset splitting
         train_data, valid_data, test_data = data_preparation(_config, _dataset)
 
         # model loading and initialization
-        if _config['model'].upper() == 'ngcf':
-            _model = NGCF()(_config, train_data.dataset).to(_config['device'])
-        else:
-            _model = get_model(_config['model'])(_config, train_data.dataset).to(_config['device'])
+        _model = utils.get_model(_config['model'])(_config, train_data.dataset).to(_config['device'])
 
         if not hyper:
             logger.info(_config)
@@ -46,7 +42,7 @@ def training(_config, saved=True, model_file=None, hyper=False, perturbed_datase
             logger.info(_model)
 
     # trainer loading and initialization
-    trainer = get_trainer(_config['MODEL_TYPE'], _config['model'])(_config, _model)
+    trainer = utils.get_trainer(_config['MODEL_TYPE'], _config['model'])(_config, _model)
     if perturbed_dataset is not None:
         explanations_path = perturbed_dataset.explanations_path
         perturbed_suffix = "_PERTURBED"
@@ -164,7 +160,6 @@ def main(model=None, dataset=None, config_file_list=None, config_dict=None, save
 
     # logger initialization
     init_logger(config)
-    logger = logging.getLogger()
 
     # if args.run == 'evaluate_perturbed' or args.run == 'graph_stats':
     #     orig_config, orig_model, orig_dataset, orig_train_data, orig_valid_data, orig_test_data = \
@@ -206,13 +201,13 @@ def main(model=None, dataset=None, config_file_list=None, config_dict=None, save
             #         *args.best_exp
             #     )
     else:
-        dataset = create_dataset(config)
-        logger.info(dataset)
+        # dataset = create_dataset(config)
+        # logger.info(dataset)
 
         if args.run == 'train':
             training(config, saved=saved, model_file=args.model_file)
         elif args.run == 'explain':
-            execute_explanation(args.model_file, *explain_args)
+            execute_explanation(config, args.model_file, *explain_args)
         elif args.run == 'recbole_hyper':
             config['seed'] = seed
             recbole_hyper(config, hyper_params_file, config_file_list, saved=saved)
@@ -241,8 +236,7 @@ if __name__ == "__main__":
     parser.add_argument('--config_file_list', nargs='+', default=None)
     parser.add_argument('--config_dict', default=None)
     parser.add_argument('--model_file', default=None)
-    explain_group.add_argument('--base_explainer_config_file', default=os.path.join("config", "base_explainer.yaml"))
-    explain_group.add_argument('--explainer_config_file', default=os.path.join("config", "explainer.yaml"))
+    explain_group.add_argument('--explainer_config_file', default=None)
     # explain_group.add_argument('--load', action='store_true')
     explain_group.add_argument('--explain_config_id', default=-1)
     explain_group.add_argument('--verbose', action='store_true')
@@ -259,6 +253,9 @@ if __name__ == "__main__":
     args, unk_args = parser.parse_known_args()
     print(args)
 
+    if args.run not in ['train', 'explain', 'recbole_hyper']:
+        raise NotImplementedError(f"The run `{args.run}` is not supported.")
+
     unk_args[::2] = map(lambda s: s.replace('-', ''), unk_args[::2])
     unk_args = dict(zip(unk_args[::2], unk_args[1::2]))
     print("Unknown args", unk_args)
@@ -269,6 +266,13 @@ if __name__ == "__main__":
 
         tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
+    current_file = os.path.dirname(os.path.realpath(__file__))
+    model_configs = os.path.join(current_file, "config", "model")
+    args.config_file_list.append(os.path.join(model_configs, f"{args.model}.yaml"))
+    if args.run == "explain" and args.explainer_config_file is None:
+        explainer_configs = os.path.join(current_file, "config", "explainer")
+        args.explainer_config_file = os.path.join(model_configs, f"{args.dataset.lower()}_explainer.yaml")
+
     if args.use_perturbed_graph:
         if args.explainer_config_file:
             # TODO: check that the path has the experiments folder setup
@@ -276,7 +280,6 @@ if __name__ == "__main__":
 
     args.wandb_online = {False: "offline", True: "online"}[args.wandb_online]
     explain_args = [
-        args.base_explainer_config_file,
         args.explainer_config_file,
         args.explain_config_id,
         args.verbose,
@@ -285,9 +288,6 @@ if __name__ == "__main__":
         args.hyper_optimize,
         args.overwrite
     ]
-
-    if args.run not in ['train', 'explain', 'recbole_hyper']:
-        raise NotImplementedError(f"The run `{args.run}` is not supported.")
 
     main(
         args.model,
