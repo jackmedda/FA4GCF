@@ -210,7 +210,7 @@ class PygPerturbedModel(object):
         if is_sparse:
             self.P_loss = pert_edge_index
         else:
-            self.P_loss = torch.sparse.FloatTensor(
+            self.P_loss = torch.sparse_coo_tensor(
                 pert_edge_index, pert_edge_weight, (self.num_all, self.num_all)
             )
 
@@ -235,7 +235,7 @@ class PygPerturbedModel(object):
         if self.inner_pyg_model.edge_weight is None:
             adj = self.inner_pyg_model.edge_index.to(cf_adj.device)
         else:
-            adj = torch.sparse.FloatTensor(
+            adj = torch.sparse_coo_tensor(
                 self.inner_pyg_model.edge_index, self.inner_pyg_model.edge_weight, (self.num_all, self.num_all)
             )
 
@@ -276,6 +276,9 @@ class PygPerturbedModel(object):
 
         if hasattr(self.inner_pyg_model, "restore_user_e") and hasattr(self.inner_pyg_model, "restore_item_e"):
             self.inner_pyg_model.restore_user_e, self.inner_pyg_model.restore_item_e = None, None
+
+        if hasattr(self.inner_pyg_model, "restore_user_rating"):
+            self.inner_pyg_model.restore_user_rating = None
 
     def predict(self, interaction, pred=False):
         self.forward(pred=pred)

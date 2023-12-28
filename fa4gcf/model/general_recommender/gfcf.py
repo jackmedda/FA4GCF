@@ -32,7 +32,7 @@ class GFCF(GeneralGraphRecommender):
 
         # generate adj_matrix to be trained with scipy and sparsesvd
         self.adj_mat = dataset.inter_matrix().tolil()
-        self.user_rating = None
+        self.restore_user_rating = None
 
         self.fake_loss = torch.nn.Parameter(torch.zeros(1))
 
@@ -67,19 +67,23 @@ class GFCF(GeneralGraphRecommender):
         U_2 = self.adj_mat @ self.norm_adj.T @ self.norm_adj
         U_1 = self.adj_mat @ self.d_mat_i @ self.vt.T @ self.vt @ self.d_mat_i_inv
 
-        self.user_rating = torch.tensor(U_2 + self.alpha * U_1).to(self.device)
+        self.restore_user_rating = torch.tensor(U_2 + self.alpha * U_1).to(self.device)
 
     def predict(self, interaction):
         user = interaction[self.USER_ID]
         item = interaction[self.ITEM_ID]
-        if self.user_rating is None:
+        if self.restore_user_rating is None:
             self._generate_user_rating()
 
-        return self.user_rating[user, item]
+        user_rating = self.restore_user_rating
+
+        return user_rating[user, item]
 
     def full_sort_predict(self, interaction):
         user = interaction[self.USER_ID]
-        if self.user_rating is None:
+        if self.restore_user_rating is None:
             self._generate_user_rating()
 
-        return self.user_rating[user]
+        user_rating = self.restore_user_rating
+
+        return user_rating[user]
