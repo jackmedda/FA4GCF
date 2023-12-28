@@ -10,7 +10,8 @@ import gnnuers.models.utils as model_utils
 import fa4gcf.utils as utils
 from fa4gcf.model.general_recommender import (
     DirectAU,
-    LightGCL
+    LightGCL,
+    GFCF
 )
 
 
@@ -270,6 +271,15 @@ class PygPerturbedModel(object):
 
             # the DirectAU forward process simply gets the encoder embeddings, so they must be restored as well
             self.inner_pyg_model.encoder.restore_user_e, self.inner_pyg_model.encoder.restore_item_e = None, None
+        elif isinstance(self.inner_pyg_model, GFCF):
+            if pert_edge_weight is None:
+                adj_mat = pert_edge_index.to_torch_sparse_coo_tensor()
+            else:
+                adj_mat = torch.sparse_coo_tensor(
+                    pert_edge_index, pert_edge_weight, (self.num_all, self.num_all)
+                )
+            self.inner_pyg_model.adj_mat = adj_mat
+            self._generate_gfcf_data()
         else:
             self.inner_pyg_model.edge_index = pert_edge_index
             self.inner_pyg_model.edge_weight = pert_edge_weight
