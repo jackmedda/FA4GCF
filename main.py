@@ -268,15 +268,24 @@ if __name__ == "__main__":
 
     current_file = os.path.dirname(os.path.realpath(__file__))
     if args.config_file_list is None:
-        dataset_configs = os.path.join(current_file, "config", "dataset")
-        args.config_file_list = [os.path.join(dataset_configs, f"{args.dataset.lower()}.yaml")]
+        all_dataset_configs = os.path.join(current_file, "config", "dataset")
+        dataset_config = os.path.join(all_dataset_configs, f"{args.dataset.lower()}.yaml")
 
-    model_configs = os.path.join(current_file, "config", "model")
-    args.config_file_list.append(os.path.join(model_configs, f"{args.model}.yaml"))
+        if os.path.isfile(dataset_config):
+            args.config_file_list = [dataset_config]
+
+    all_model_configs = os.path.join(current_file, "config", "model")
+    model_config = os.path.join(all_model_configs, f"{args.model}.yaml")
+
+    if os.path.isfile(model_config):
+        args.config_file_list.append(model_config)
 
     if args.run == "explain" and args.explainer_config_file is None:
-        explainer_configs = os.path.join(current_file, "config", "explainer")
-        args.explainer_config_file = os.path.join(model_configs, f"{args.dataset.lower()}_explainer.yaml")
+        all_explainer_configs = os.path.join(current_file, "config", "explainer")
+        explainer_config = os.path.join(all_explainer_configs, f"{args.dataset.lower()}_explainer.yaml")
+
+        if os.path.isfile(explainer_config):
+            args.explainer_config_file = explainer_config
 
     if args.use_perturbed_graph:
         if args.explainer_config_file:
