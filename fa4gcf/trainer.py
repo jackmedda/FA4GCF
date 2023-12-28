@@ -2,8 +2,12 @@ from time import time
 import math
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from tqdm import tqdm
-from recbole.trainer import Trainer
+from recbole.trainer import Trainer, TraditionalTrainer
 from recbole.utils import early_stopping, dict2str, set_color, get_gpu_usage
+
+
+class GFCFTrainer(TraditionalTrainer):
+    pass
 
 
 class NCLTrainer(Trainer):

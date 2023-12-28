@@ -8,7 +8,7 @@ import logging
 
 import numpy as np
 import pandas as pd
-from recbole.trainer import HyperTuning
+from recbole.trainer import HyperTuning, TraditionalTrainer
 from recbole.data import data_preparation
 from recbole.utils import init_logger, init_seed, set_color, get_local_time
 
@@ -87,7 +87,7 @@ def training(_config, saved=True, model_file=None, hyper=False, perturbed_datase
     # model evaluation
     test_result = trainer.evaluate(
         test_data,
-        load_best_model=saved,
+        load_best_model=saved and not isinstance(trainer, TraditionalTrainer),
         show_progress=_config['show_progress'] and not hyper
     )
 
@@ -267,8 +267,13 @@ if __name__ == "__main__":
         tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
     current_file = os.path.dirname(os.path.realpath(__file__))
+    if args.config_file_list is None:
+        dataset_configs = os.path.join(current_file, "config", "dataset")
+        args.config_file_list = [os.path.join(dataset_configs, f"{args.dataset.lower()}.yaml")]
+
     model_configs = os.path.join(current_file, "config", "model")
     args.config_file_list.append(os.path.join(model_configs, f"{args.model}.yaml"))
+
     if args.run == "explain" and args.explainer_config_file is None:
         explainer_configs = os.path.join(current_file, "config", "explainer")
         args.explainer_config_file = os.path.join(model_configs, f"{args.dataset.lower()}_explainer.yaml")

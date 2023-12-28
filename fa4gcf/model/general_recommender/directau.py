@@ -1,12 +1,12 @@
-# r"""
-# DiretAU
-# ################################################
-# Reference:
-#     Chenyang Wang et al. "Towards Representation Alignment and Uniformity in Collaborative Filtering." in KDD 2022.
+r"""
+DiretAU
+################################################
+Reference:
+    Chenyang Wang et al. "Towards Representation Alignment and Uniformity in Collaborative Filtering." in KDD 2022.
 
-# Reference code:
-#     https://github.com/THUwangcy/DirectAU
-# """
+Reference code:
+    https://github.com/THUwangcy/DirectAU
+"""
 
 import numpy as np
 import torch

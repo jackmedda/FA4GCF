@@ -66,6 +66,7 @@ class NCL(GeneralGraphRecommender):
     def run_kmeans(self, x):
         """Run K-means algorithm to get k clusters of the input tensor x
         """
+        # faiss-gpu==1.7.2
         import faiss
         kmeans = faiss.Kmeans(d=self.latent_dim, k=self.k, gpu=True)
         kmeans.train(x)

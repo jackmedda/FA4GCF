@@ -9,7 +9,7 @@ hyper_layers: 1
 alpha: 1
 
 proto_reg: 8e-8
-num_clusters: 1000
+num_clusters: 1000  # lastfm-1k: 6
 
 m_step: 1
 warm_up_step: 20
