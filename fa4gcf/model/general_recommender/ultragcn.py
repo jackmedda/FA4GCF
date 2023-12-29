@@ -57,7 +57,6 @@ class UltraGCN(GeneralGraphRecommender):
         # parameters initialization
         torch.nn.init.normal_(self.user_embedding.weight, std=self.initial_weight)
         torch.nn.init.normal_(self.item_embedding.weight, std=self.initial_weight)
-        self.other_parameter_name = ['restore_user_e', 'restore_item_e']
 
     def _get_ii_constrain_mat(self, adj_mat):
         A = adj_mat.T.dot(adj_mat).tocoo()
