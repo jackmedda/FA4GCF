@@ -272,11 +272,13 @@ if __name__ == "__main__":
     if os.path.isfile(base_config):
         args.config_file_list = [base_config] if args.config_file_list is None else [base_config] + args.config_file_list
 
-    if args.config_file_list is None:
-        all_dataset_configs = os.path.join(current_file, "config", "dataset")
-        dataset_config = os.path.join(all_dataset_configs, f"{args.dataset.lower()}.yaml")
-        if os.path.isfile(dataset_config):
+    all_dataset_configs = os.path.join(current_file, "config", "dataset")
+    dataset_config = os.path.join(all_dataset_configs, f"{args.dataset.lower()}.yaml")
+    if os.path.isfile(dataset_config):
+        if args.config_file_list is None:
             args.config_file_list = [dataset_config]
+        else:
+            args.config_file_list.append(dataset_config)
 
     all_model_configs = os.path.join(current_file, "config", "model")
     model_config = os.path.join(all_model_configs, f"{args.model}.yaml")

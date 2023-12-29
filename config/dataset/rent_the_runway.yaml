@@ -2,3 +2,6 @@ TIMESTAMP_FIELD: 'review_date'
 train_batch_size: 256
 eval_batch_size: 512
 load_col: {'inter': ['user_id', 'item_id', 'review_date']}
+
+# NCL
+num_clusters: 100

@@ -4,3 +4,6 @@ TIMESTAMP_FIELD: 'timestamp'
 train_batch_size: 4096
 eval_batch_size: 2048
 load_col: {'inter': ['customer_id', 'product_id']}
+
+# NCL
+num_clusters: 500
