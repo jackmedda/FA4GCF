@@ -1,0 +1,15 @@
+learner: adam
+
+embedding_size: 64
+w1: 1e-7
+w2: 1
+w3: 1
+w4: 1
+ii_neighbor_num: 10
+initial_weight: 1e-3
+negative_weight: 200
+gamma: 1e-4
+lambda: 2.75
+
+train_neg_sample_args:
+  sample_num: 200

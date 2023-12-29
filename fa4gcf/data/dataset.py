@@ -32,7 +32,7 @@ class Dataset(GNNUERS_Dataset):
         num_nodes = self.user_num + self.item_num
 
         if enable_sparse:
-            if not is_sparse:
+            if not self.is_sparse:
                 self.logger.warning(
                     "Import `torch_sparse` error, please install corrsponding version of `torch_sparse`."
                     "Dense edge_index will be used instead of SparseTensor in dataset."

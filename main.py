@@ -267,16 +267,19 @@ if __name__ == "__main__":
         tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
     current_file = os.path.dirname(os.path.realpath(__file__))
+
+    base_config = os.path.join(current_file, "config", "base_config.yaml")
+    if os.path.isfile(base_config):
+        args.config_file_list = [base_config] if args.config_file_list is None else [base_config] + args.config_file_list
+
     if args.config_file_list is None:
         all_dataset_configs = os.path.join(current_file, "config", "dataset")
         dataset_config = os.path.join(all_dataset_configs, f"{args.dataset.lower()}.yaml")
-
         if os.path.isfile(dataset_config):
             args.config_file_list = [dataset_config]
 
     all_model_configs = os.path.join(current_file, "config", "model")
     model_config = os.path.join(all_model_configs, f"{args.model}.yaml")
-
     if os.path.isfile(model_config):
         args.config_file_list.append(model_config)
 
