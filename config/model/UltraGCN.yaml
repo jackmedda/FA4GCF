@@ -11,5 +11,5 @@ negative_weight: 200
 gamma: 1e-4
 lambda: 2.75
 
-train_neg_sample_args:
-  sample_num: 200
+#train_neg_sample_args:
+#  sample_num: 200
