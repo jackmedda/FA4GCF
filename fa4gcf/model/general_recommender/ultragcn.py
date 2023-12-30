@@ -14,8 +14,8 @@ import numpy as np
 
 from recbole.utils import ModelType, InputType
 
-from fa4gcf.model.loss import L_Loss, I_Loss, NormLoss
 from fa4gcf.model.abstract_recommender import GeneralGraphRecommender
+from fa4gcf.model.loss import LLoss, ILoss, NormLoss
 
 
 class UltraGCN(GeneralGraphRecommender):
@@ -31,7 +31,7 @@ class UltraGCN(GeneralGraphRecommender):
         self.w4 = config["w4"]
 
         # load parameters info
-        self.latent_dim = config['embedding_size']  # int type:the embedding size of lightGCN
+        self.embedding_size = config['embedding_size']  # int type:the embedding size of lightGCN
         self.ii_neighbor_num = config["ii_neighbor_num"]  # int type: neighbors in the item-item co-occurrence graph
         self.initial_weight = config['initial_weight']  # float type: standard deviation of normal initialization
         self.gamma = config['gamma']  # float type: weight parameter of norm_loss
@@ -48,10 +48,10 @@ class UltraGCN(GeneralGraphRecommender):
         )
 
         # define layers and loss
-        self.user_embedding = torch.nn.Embedding(num_embeddings=self.n_users, embedding_dim=self.latent_dim)
-        self.item_embedding = torch.nn.Embedding(num_embeddings=self.n_items, embedding_dim=self.latent_dim)
-        self.l_loss = L_Loss(negative_weight=config['negative_weight'])
-        self.i_loss = I_Loss()
+        self.user_embedding = torch.nn.Embedding(num_embeddings=self.n_users, embedding_dim=self.embedding_size)
+        self.item_embedding = torch.nn.Embedding(num_embeddings=self.n_items, embedding_dim=self.embedding_size)
+        self.l_loss = LLoss(negative_weight=config['negative_weight'])
+        self.i_loss = ILoss()
         self.norm_loss = NormLoss()
 
         # parameters initialization

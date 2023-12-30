@@ -1,0 +1,10 @@
+reg_weight: 1e-5                  # weight decay regularizer
+ssl_reg_weight: 1                 # contrastive\self-supervised learning regularizer
+embedding_size: 32                # embedding size
+head: 4                           # number of heads in attention
+n_gcn_layers: 2                   # number of gcn layers
+n_gt_layers: 1                    # number of graph transformer layers
+n_seeds: 200                      # number of seeds in patch masking
+mask_depth: 2                     # depth to mask of the SubgraphRandomMasker
+sampled_graph_steps: 10           # steps to train on the same sampled graph
+keep_rate: 0.2                    # ratio of nodes to keep for the LocalGraphSampler

@@ -8,4 +8,5 @@ from fa4gcf.model.general_recommender.simgcl import SimGCL
 from fa4gcf.model.general_recommender.xsimgcl import XSimGCL
 from fa4gcf.model.general_recommender.directau import DirectAU
 from fa4gcf.model.general_recommender.gfcf import GFCF
-# from fa4gcf.model.general_recommender.ultragcn import UltraGCN
+from fa4gcf.model.general_recommender.ultragcn import UltraGCN
+from fa4gcf.model.general_recommender.autocf import AutoCF

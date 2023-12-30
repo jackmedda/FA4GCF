@@ -2,11 +2,33 @@ import torch
 import torch.nn as nn
 
 
-class L_Loss(nn.Module):
+class ContrastiveLoss(nn.Module):
     """L_Loss used by UltraGCN"""
 
+    def __init__(self):
+        super(ContrastiveLoss, self).__init__()
+
+    def forward(self, nodes, nodes_embeddings, other_nodes_embeddings=None):
+        if other_nodes_embeddings is not None:
+            nodes_embeddings = nodes_embeddings[nodes]
+            scores = torch.log(
+                torch.exp(nodes_embeddings.mm(other_nodes_embeddings.T)).sum(-1)
+            ).mean()
+        else:
+            unique_nodes = torch.unique(nodes)
+            nodes_embeddings = nodes_embeddings[unique_nodes]
+            scores = torch.log(
+                torch.exp(nodes_embeddings.mm(nodes_embeddings.T)).sum(-1)
+            ).mean()
+
+        return scores
+
+
+class LLoss(nn.Module):
+    """LLoss used by UltraGCN"""
+
     def __init__(self, negative_weight=200):
-        super(L_Loss, self).__init__()
+        super(LLoss, self).__init__()
         self.negative_weight = negative_weight
 
     def forward(self, pos_scores, neg_scores, omega_weight):
@@ -29,11 +51,11 @@ class L_Loss(nn.Module):
         return loss.sum()
 
 
-class I_Loss(nn.Module):
-    """I_Loss used by UltraGCN"""
+class ILoss(nn.Module):
+    """ILoss used by UltraGCN"""
 
     def __init__(self):
-        super(I_Loss, self).__init__()
+        super(ILoss, self).__init__()
 
     def forward(self, sim_scores, neighbor_scores):
         loss = neighbor_scores.sum(dim=-1).sigmoid().log()

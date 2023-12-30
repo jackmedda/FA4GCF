@@ -1,9 +1,15 @@
-from time import time
 import math
+import functools
+from time import time
+
+import torch
+import torch.cuda.amp as amp
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from tqdm import tqdm
 from recbole.trainer import Trainer, TraditionalTrainer
 from recbole.utils import early_stopping, dict2str, set_color, get_gpu_usage
+
+from fa4gcf.model.general_recommender.autocf import LocalGraphSampler, SubgraphRandomMasker
 
 
 class GFCFTrainer(TraditionalTrainer):
@@ -170,14 +176,104 @@ class HMLETTrainer(Trainer):
         return super()._train_epoch(train_data, epoch_idx, loss_func, show_progress)
 
 
-class SEPTTrainer(Trainer):
+class AutoCFTrainer(Trainer):
     def __init__(self, config, model):
-        super(SEPTTrainer, self).__init__(config, model)
-        self.warm_up_epochs = config['warm_up_epochs']
+        super(AutoCFTrainer, self).__init__(config, model)
+
+        self.sampled_graph_steps = config['sampled_graph_steps']
+
+        self.local_graph_sampler = LocalGraphSampler(config['n_seeds'])
+        self.subgraph_random_masker = SubgraphRandomMasker(
+            config['mask_depth'],
+            config['keep_rate'],
+            model.n_users + model.n_items
+        )
 
     def _train_epoch(self, train_data, epoch_idx, loss_func=None, show_progress=False):
-        if epoch_idx < self.warm_up_epochs:
-            loss_func = self.model.calculate_rec_loss
-        else:
-            self.model.subgraph_construction()
-        return super()._train_epoch(train_data, epoch_idx, loss_func, show_progress)
+        r"""Train the model in an epoch
+
+        Args:
+            train_data (DataLoader): The train data.
+            epoch_idx (int): The current epoch id.
+            loss_func (function): The loss function of :attr:`model`. If it is ``None``, the loss function will be
+                :attr:`self.model.calculate_loss`. Defaults to ``None``.
+            show_progress (bool): Show the progress of training epoch. Defaults to ``False``.
+
+        Returns:
+            float/tuple: The sum of loss returned by all batches in this epoch. If the loss in each batch contains
+            multiple parts and the model return these multiple parts loss instead of the sum of loss, it will return a
+            tuple which includes the sum of loss in each part.
+        """
+        self.model.train()
+        loss_func = loss_func or self.model.calculate_loss
+        total_loss = None
+        iter_data = (
+            tqdm(
+                train_data,
+                total=len(train_data),
+                ncols=100,
+                desc=set_color(f"Train {epoch_idx:>5}", "pink"),
+            )
+            if show_progress
+            else train_data
+        )
+
+        if not self.config["single_spec"] and train_data.shuffle:
+            train_data.sampler.set_epoch(epoch_idx)
+
+        sample_scores = None
+        encoder_edge_index, encoder_edge_weight, decoder_edge_index = None, None, None
+
+        scaler = amp.GradScaler(enabled=self.enable_scaler)
+        for batch_idx, interaction in enumerate(iter_data):
+            interaction = interaction.to(self.device)
+            self.optimizer.zero_grad()
+            sync_loss = 0
+            if not self.config["single_spec"]:
+                self.set_reduce_hook()
+                sync_loss = self.sync_grad_loss()
+
+            with torch.autocast(device_type=self.device.type, enabled=self.enable_amp):
+                ################## AutoCF ####################
+                if batch_idx % self.sampled_graph_steps == 0:
+                    sample_scores, seeds = self.local_graph_sampler(
+                        self.model.get_ego_embeddings(), self.model.edge_index, self.model.edge_weight
+                    )
+                    encoder_edge_index, encoder_edge_weight, decoder_edge_index = self.subgraph_random_masker(
+                        self.model.edge_index, self.model.edge_weight, seeds
+                    )
+                ##############################################
+
+                losses = loss_func(interaction, encoder_edge_index, encoder_edge_weight, decoder_edge_index)
+
+            if isinstance(losses, tuple):
+                loss = sum(losses)
+                loss_tuple = tuple(per_loss.item() for per_loss in losses)
+                total_loss = (
+                    loss_tuple
+                    if total_loss is None
+                    else tuple(map(sum, zip(total_loss, loss_tuple)))
+                )
+            else:
+                loss = losses
+                total_loss = (
+                    losses.item() if total_loss is None else total_loss + losses.item()
+                )
+
+            ################## AutoCF ####################
+            if batch_idx % self.sampled_graph_steps == 0:
+                local_global_loss = -sample_scores.mean()
+                loss += local_global_loss
+            ##############################################
+
+            self._check_nan(loss)
+            scaler.scale(loss + sync_loss).backward()
+            if self.clip_grad_norm:
+                clip_grad_norm_(self.model.parameters(), **self.clip_grad_norm)
+            scaler.step(self.optimizer)
+            scaler.update()
+            if self.gpu_available and show_progress:
+                iter_data.set_postfix_str(
+                    set_color("GPU RAM: " + get_gpu_usage(self.device), "yellow")
+                )
+        return total_loss

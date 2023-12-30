@@ -4,6 +4,7 @@ from torch_geometric.nn.conv.gcn_conv import gcn_norm
 from gnnuers.data import Dataset as GNNUERS_Dataset
 
 import fa4gcf.utils as utils
+from fa4gcf.model.general_recommender import AutoCF
 
 
 class Dataset(GNNUERS_Dataset):
@@ -31,6 +32,8 @@ class Dataset(GNNUERS_Dataset):
         edge_weight = torch.ones(edge_index.size(1))
         num_nodes = self.user_num + self.item_num
 
+        add_self_loops = self.config.model in [AutoCF.__name__]
+
         if enable_sparse:
             if not self.is_sparse:
                 self.logger.warning(
@@ -39,9 +42,9 @@ class Dataset(GNNUERS_Dataset):
                 )
             else:
                 adj_t = utils.edge_index_to_adj_t(edge_index, edge_weight, num_nodes, num_nodes)
-                adj_t = gcn_norm(adj_t, None, num_nodes, add_self_loops=False)
+                adj_t = gcn_norm(adj_t, None, num_nodes, add_self_loops=add_self_loops)
                 return adj_t, None
 
-        edge_index, edge_weight = gcn_norm(edge_index, edge_weight, num_nodes, add_self_loops=False)
+        edge_index, edge_weight = gcn_norm(edge_index, edge_weight, num_nodes, add_self_loops=add_self_loops)
 
         return edge_index, edge_weight
