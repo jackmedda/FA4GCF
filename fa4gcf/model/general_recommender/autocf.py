@@ -111,7 +111,7 @@ class AutoCF(GeneralGraphRecommender):
         scores = torch.mul(u_embeddings, i_embeddings).sum(dim=1)
         return scores
 
-    def full_predict(self, interaction):
+    def full_sort_predict(self, interaction):
         user = interaction[self.USER_ID]
 
         user_all_embeddings, item_all_embeddings = self.forward(
@@ -142,7 +142,11 @@ class GTLayer(torch.nn.Module):
         torch.nn.init.xavier_uniform_(self.v)
 
     def forward(self, all_embeddings, edge_index):
-        rows, cols = edge_index
+        if isinstance(edge_index, torch.Tensor):
+            rows, cols = edge_index
+        else:  # it should be a pytorch_sparse SparseTensor
+            rows, cols, _ = edge_index.coo()
+
         row_embeddings = all_embeddings[rows]
         col_embeddings = all_embeddings[cols]
 

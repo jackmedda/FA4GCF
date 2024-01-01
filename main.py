@@ -8,13 +8,14 @@ import logging
 
 import numpy as np
 import pandas as pd
-from recbole.trainer import HyperTuning, TraditionalTrainer
+from recbole.trainer import TraditionalTrainer
 from recbole.data import data_preparation
 from recbole.utils import init_logger, init_seed, set_color, get_local_time
 
 import fa4gcf.utils as utils
 from fa4gcf.config import Config
 from fa4gcf.data import Dataset, PerturbedDataset
+from fa4gcf.trainer import HyperTuning
 from explain import execute_explanation
 
 
@@ -115,10 +116,16 @@ def recbole_hyper(base_config, params_file, config_file_list, saved=True):
         init_seed(base_config['seed'], config['reproducibility'])
         logging.basicConfig(level=logging.ERROR)
 
-        return training(config, saved=False, hyper=True)
+        train_result = training(config, saved=False, hyper=True)
+        train_result['model'] = base_config['model']
+        return train_result
 
     hp = HyperTuning(
-        objective_function, algo='exhaustive', params_file=params_file, fixed_config_file_list=config_file_list
+        objective_function,
+        base_config['model'],
+        algo='exhaustive',
+        params_file=params_file,
+        fixed_config_file_list=config_file_list
     )
     hp.run()
 
@@ -132,13 +139,15 @@ def recbole_hyper(base_config, params_file, config_file_list, saved=True):
     print(hp.params2result[hp.params2str(hp.best_params)])
 
     with open(output_file, 'r+') as f:
+        from pprint import pprint
         content = f.read()
         f.seek(0, 0)
         f.write(
             'Best Params and Results\n' +
-            str(hp.best_params).rstrip('\r\n') + '\n' +
-            str(hp.params2result[hp.params2str(hp.best_params)]) + '\n\n' + content
+            str(hp.best_params).rstrip('\r\n') + '\n'
         )
+        pprint(hp.params2result[hp.params2str(hp.best_params)], stream=f)
+        f.write('\n\n' + content)
 
 
 def main(model=None, dataset=None, config_file_list=None, config_dict=None, saved=True, seed=None, hyper_params_file=None):
@@ -156,7 +165,6 @@ def main(model=None, dataset=None, config_file_list=None, config_dict=None, save
     config['data_path'] = os.path.join(config.file_config_dict['data_path'], config.dataset)
     seed = seed or config['seed']
     init_seed(seed, config['reproducibility'])
-    import torch; torch.use_deterministic_algorithms(True)
 
     # logger initialization
     init_logger(config)
@@ -166,6 +174,7 @@ def main(model=None, dataset=None, config_file_list=None, config_dict=None, save
     #         utils.load_data_and_model(args.original_model_file, args.explainer_config_file)
 
     if args.use_perturbed_graph:
+        import torch; torch.use_deterministic_algorithms(True)
         perturbed_dataset = PerturbedDataset(config, args.explanations_path, args.best_exp)
         if args.run == 'train':
             training(config, saved=saved, model_file=args.model_file, perturbed_dataset=perturbed_dataset)
@@ -207,6 +216,7 @@ def main(model=None, dataset=None, config_file_list=None, config_dict=None, save
         if args.run == 'train':
             training(config, saved=saved, model_file=args.model_file)
         elif args.run == 'explain':
+            import torch; torch.use_deterministic_algorithms(True)
             execute_explanation(config, args.model_file, *explain_args)
         elif args.run == 'recbole_hyper':
             config['seed'] = seed

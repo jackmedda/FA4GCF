@@ -16,7 +16,7 @@ from recbole.data.dataloader import FullSortEvalDataLoader
 
 import gnnuers.utils as utils
 
-from fa4gcf.perturbation_trainer import PerturbationTrainer
+from fa4gcf.trainer import PerturbationTrainer
 
 
 script_path = os.path.abspath(os.path.dirname(inspect.getsourcefile(lambda: 0)))

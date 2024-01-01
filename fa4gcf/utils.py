@@ -48,7 +48,7 @@ def get_trainer(model_type, model_name):
         Trainer: trainer class
     """
     try:
-        return getattr(importlib.import_module('fa4gcf.trainer'), model_name + 'Trainer')
+        return getattr(importlib.import_module('fa4gcf.trainer.trainer'), model_name + 'Trainer')
     except AttributeError:
         return get_recbole_trainer(model_type, model_name)
 
