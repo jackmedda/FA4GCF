@@ -1,2 +1,2 @@
-svd_factors: 256
+svd_factors: 64
 gfcf_alpha: 0.3

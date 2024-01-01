@@ -1,5 +1,5 @@
 embedding_size: 64              # (int) The embedding size of users and items.
-n_layers: 2                     # (int) The number of layers in LightGCL.
+n_layers: 3                     # (int) The number of layers in LightGCL.
 dropout: 0.0                    # (float) The dropout ratio.
 temp: 0.8                       # (float) The temperature in softmax.
 lambda1: 0.01                   # (float) The hyperparameter to control the strengths of SSL.

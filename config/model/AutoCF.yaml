@@ -1,6 +1,6 @@
 reg_weight: 1e-5                  # weight decay regularizer
 ssl_reg_weight: 1                 # contrastive\self-supervised learning regularizer
-embedding_size: 32                # embedding size
+embedding_size: 64                # embedding size
 head: 4                           # number of heads in attention
 n_gcn_layers: 2                   # number of gcn layers
 n_gt_layers: 1                    # number of graph transformer layers

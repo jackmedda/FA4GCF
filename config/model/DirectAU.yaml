@@ -2,6 +2,6 @@ embedding_size: 64
 encoder: "LightGCN"   # "MF" or "lightGCN"
 gamma: 0.5
 weight_decay: 1e-6
-train_batch_size: 256
+# train_batch_size: 256
 
-n_layers: 3 # needed for LightGCN
+n_layers: 3  # needed for LightGCN

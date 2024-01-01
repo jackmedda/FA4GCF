@@ -35,7 +35,7 @@ class UltraGCN(GeneralGraphRecommender):
         self.ii_neighbor_num = config["ii_neighbor_num"]  # int type: neighbors in the item-item co-occurrence graph
         self.initial_weight = config['initial_weight']  # float type: standard deviation of normal initialization
         self.gamma = config['gamma']  # float type: weight parameter of norm_loss
-        self.lambda_ = config['lambda']  # float type: weight parameter of I_Loss
+        self.lambda_ = config['ILoss_lambda']  # float type: weight parameter of ILoss
         self.negative_num = config['train_neg_sample_args']['sample_num']
 
         # constraint matrix generation, item-item constraint matrix generation

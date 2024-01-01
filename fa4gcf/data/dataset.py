@@ -9,6 +9,10 @@ from fa4gcf.model.general_recommender import AutoCF
 
 class Dataset(GNNUERS_Dataset):
 
+    @staticmethod
+    def edge_index_to_adj_t(edge_index, edge_weight, m_num_nodes, n_num_nodes):
+        return utils.edge_index_to_adj_t(edge_index, edge_weight, m_num_nodes, n_num_nodes)
+
     def get_norm_adj_mat(self, enable_sparse=False):
         r"""Get the normalized interaction matrix of users and items.
         Construct the square matrix from the training data and normalize it
@@ -41,7 +45,7 @@ class Dataset(GNNUERS_Dataset):
                     "Dense edge_index will be used instead of SparseTensor in dataset."
                 )
             else:
-                adj_t = utils.edge_index_to_adj_t(edge_index, edge_weight, num_nodes, num_nodes)
+                adj_t = self.edge_index_to_adj_t(edge_index, edge_weight, num_nodes, num_nodes)
                 adj_t = gcn_norm(adj_t, None, num_nodes, add_self_loops=add_self_loops)
                 return adj_t, None
 

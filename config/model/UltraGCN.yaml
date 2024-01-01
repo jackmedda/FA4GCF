@@ -7,9 +7,9 @@ w3: 1
 w4: 1
 ii_neighbor_num: 10
 initial_weight: 1e-3
-negative_weight: 200
+negative_weight: 10
 gamma: 1e-4
-lambda: 2.75
+ILoss_lambda: 2.75
 
 #train_neg_sample_args:
 #  sample_num: 200
