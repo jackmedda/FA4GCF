@@ -131,6 +131,8 @@ class GTLayer(torch.nn.Module):
 
         self.embedding_size = embedding_size
         self.head = head
+        # ensure embedding can be divided into <head> heads
+        assert self.embedding_size % self.head == 0, "Embeddings size must be a multiple of transformer heads"
 
         self.q = torch.nn.Parameter(torch.empty(self.embedding_size, self.embedding_size))
         self.k = torch.nn.Parameter(torch.empty(self.embedding_size, self.embedding_size))

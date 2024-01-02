@@ -1,0 +1,14 @@
+insurance:
+  alpha: 0.8
+  learning_rate: 2e-4
+  ssl_reg_weight: 0.1
+lastfm-1k:
+  alpha: 1.5
+  learning_rate: 2e-4
+  ssl_reg_weight: 0.1
+ml-1m:
+rent_the_runway:
+  alpha: 0.8
+  learning_rate: 2e-4
+  ssl_reg_weight: 0.05
+tafeng:

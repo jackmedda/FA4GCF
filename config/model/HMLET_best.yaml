@@ -1,0 +1,14 @@
+insurance:
+  activation_function: elu
+  learning_rate: 2e-4
+  ori_temp: 0.7
+lastfm-1k:
+  activation_function: leakyrelu
+  learning_rate: 2e-4
+  ori_temp: 0.7
+ml-1m:
+rent_the_runway:
+  activation_function: elu
+  learning_rate: 2e-4
+  ori_temp: 0.5
+tafeng:

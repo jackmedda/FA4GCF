@@ -150,7 +150,13 @@ def recbole_hyper(base_config, params_file, config_file_list, saved=True):
         f.write('\n\n' + content)
 
 
-def main(model=None, dataset=None, config_file_list=None, config_dict=None, saved=True, seed=None, hyper_params_file=None):
+def main(model=None,
+         dataset=None,
+         config_file_list=None,
+         config_dict=None,
+         saved=True,
+         seed=None,
+         hyper_params_file=None):
     r""" A fast running api, which includes the complete process of
     training and testing a model on a specified dataset
     Args:
@@ -244,7 +250,6 @@ if __name__ == "__main__":
     parser.add_argument('--model', default='GCMC')
     parser.add_argument('--dataset', default='ml-100k')
     parser.add_argument('--config_file_list', nargs='+', default=None)
-    parser.add_argument('--config_dict', default=None)
     parser.add_argument('--model_file', default=None)
     explain_group.add_argument('--explainer_config_file', default=None)
     # explain_group.add_argument('--load', action='store_true')
@@ -262,6 +267,7 @@ if __name__ == "__main__":
 
     args, unk_args = parser.parse_known_args()
     print(args)
+    config_dict = {}
 
     if args.run not in ['train', 'explain', 'recbole_hyper']:
         raise NotImplementedError(f"The run `{args.run}` is not supported.")
@@ -302,10 +308,17 @@ if __name__ == "__main__":
         if os.path.isfile(explainer_config):
             args.explainer_config_file = explainer_config
 
-    if args.use_perturbed_graph:
-        if args.explainer_config_file:
-            # TODO: check that the path has the experiments folder setup
-            pass
+    if args.run == "train":
+        model_best_config = os.path.join(all_model_configs, f"{args.model}_best.yaml")
+        if os.path.isfile(model_best_config):
+            with open(model_best_config, 'r') as best_conf_file:
+                best_conf_dict = yaml.load(best_conf_file, Loader=Config._build_yaml_loader())
+            config_dict.update(best_conf_dict[args.dataset.lower()])
+
+        if args.use_perturbed_graph:
+            if args.explainer_config_file:
+                # TODO: check that the path has the experiments folder setup
+                pass
 
     args.wandb_online = {False: "offline", True: "online"}[args.wandb_online]
     explain_args = [
@@ -322,7 +335,7 @@ if __name__ == "__main__":
         args.model,
         args.dataset,
         args.config_file_list,
-        args.config_dict,
+        config_dict,
         seed=args.seed,
         hyper_params_file=args.params_file
     )

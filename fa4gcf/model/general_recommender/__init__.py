@@ -10,3 +10,4 @@ from fa4gcf.model.general_recommender.directau import DirectAU
 from fa4gcf.model.general_recommender.gfcf import GFCF
 from fa4gcf.model.general_recommender.ultragcn import UltraGCN
 from fa4gcf.model.general_recommender.autocf import AutoCF
+from fa4gcf.model.general_recommender.dgcf import DGCF

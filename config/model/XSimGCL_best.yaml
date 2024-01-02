@@ -1,0 +1,13 @@
+insurance:
+  eps: 0.1
+  lambda: 0.1
+  learning_rate: 2e-4
+  temperature: 0.05
+lastfm-1k:
+ml-1m:
+rent_the_runway:
+  eps: 0.1
+  lambda: 0.1
+  learning_rate: 2e-4
+  temperature: 0.1
+tafeng:

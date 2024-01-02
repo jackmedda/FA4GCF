@@ -1,0 +1,11 @@
+insurance:
+  gamma: 0.5
+  learning_rate: 1e-4
+lastfm-1k:
+  gamma: 0.5
+  learning_rate: 1e-4
+ml-1m:
+rent_the_runway:
+  gamma: 1.5
+  learning_rate: 2e-4
+tafeng:
