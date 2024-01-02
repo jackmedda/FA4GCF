@@ -8,7 +8,7 @@ train_batch_size: 4096
 eval_batch_size: 2048
 train_neg_sample_args:          # (dict) Negative sampling configuration for model training.
   distribution: uniform         # (str) The distribution of negative items.
-  sample_num: 1                 # (int) The sampled num of negative items.
+  sample_num: 10                # (int) The sampled num of negative items.
   alpha: 1.0                    # (float) The power of sampling probability for popularity distribution.
   dynamic: False                # (bool) Whether to use dynamic negative sampling.
   candidate_num: 0
