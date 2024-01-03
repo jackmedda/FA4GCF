@@ -7,6 +7,13 @@ insurance:
   w3: 1e-7
   w4: 1e-7
 lastfm-1k:
+  ILoss_lambda: 1.0
+  learning_rate: 2e-4
+  negative_weight: 10
+  w1: 1.0
+  w2: 1.0
+  w3: 1e-7
+  w4: 1.0
 ml-1m:
 rent_the_runway:
   ILoss_lambda: 1e-7
