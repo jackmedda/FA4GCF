@@ -1,4 +1,6 @@
 import os
+import re
+import yaml
 
 from recbole.config import Config as Recbole_Config
 
@@ -55,3 +57,22 @@ class Config(Recbole_Config):
             config_dict.update(exp_config_dict)
 
         return config_dict
+
+    @staticmethod
+    def _build_yaml_loader():
+        loader = yaml.FullLoader
+        loader.add_implicit_resolver(
+            "tag:yaml.org,2002:float",
+            re.compile(
+                """^(?:
+             [-+]?(?:[0-9][0-9_]*)\\.[0-9_]*(?:[eE][-+]?[0-9]+)?
+            |[-+]?(?:[0-9][0-9_]*)(?:[eE][-+]?[0-9]+)
+            |\\.[0-9_]+(?:[eE][-+][0-9]+)?
+            |[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\\.[0-9_]*
+            |[-+]?\\.(?:inf|Inf|INF)
+            |\\.(?:nan|NaN|NAN))$""",
+                re.X,
+            ),
+            list("-+0123456789."),
+        )
+        return loader

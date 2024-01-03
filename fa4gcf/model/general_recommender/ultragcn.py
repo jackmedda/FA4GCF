@@ -59,23 +59,37 @@ class UltraGCN(GeneralGraphRecommender):
         torch.nn.init.normal_(self.item_embedding.weight, std=self.initial_weight)
 
     def _get_ii_constrain_mat(self, adj_mat):
-        A = adj_mat.T.dot(adj_mat).tocoo()
-        A = torch.sparse_coo_tensor(
-            torch.stack((torch.from_numpy(A.row), torch.from_numpy(A.col))),
-            torch.from_numpy(A.data),
-            A.shape,
-            device=self.device
-        )
+        try:
+            A = adj_mat.T.dot(adj_mat).tocoo()
+            A = torch.sparse_coo_tensor(
+                torch.stack((torch.from_numpy(A.row), torch.from_numpy(A.col))),
+                torch.from_numpy(A.data),
+                A.shape,
+                device=self.device
+            )
 
-        item_col_degree = A.sum(dim=1).to_dense()  # users_D
-        item_row_degree = A.sum(dim=0).to_dense()  # items_D
+            item_col_degree = A.sum(dim=1).to_dense()  # users_D
+            item_row_degree = A.sum(dim=0).to_dense()  # items_D
 
-        beta_item_colD = (torch.sqrt(item_col_degree + 1) / item_col_degree).reshape(-1, 1)  # beta_uD
-        beta_item_rowD = (1 / torch.sqrt(item_row_degree + 1)).reshape(1, -1)  # beta_iD
-        all_ii_constrain_mat = torch.mm(beta_item_colD, beta_item_rowD)
+            beta_item_colD = (torch.sqrt(item_col_degree + 1) / item_col_degree).reshape(-1, 1)  # beta_uD
+            beta_item_rowD = (1 / torch.sqrt(item_row_degree + 1)).reshape(1, -1)  # beta_iD
+            all_ii_constrain_mat = torch.mm(beta_item_colD, beta_item_rowD)
 
-        ii_neighbors_matrix = (all_ii_constrain_mat * A).to_dense()
-        ii_neighbors_sim, ii_neighbors_idxs = torch.topk(ii_neighbors_matrix, k=self.ii_neighbor_num, dim=1)
+            ii_neighbors_matrix = (all_ii_constrain_mat * A).to_dense()
+            ii_neighbors_sim, ii_neighbors_idxs = torch.topk(ii_neighbors_matrix, k=self.ii_neighbor_num, dim=1)
+        except RuntimeError:  # or torch.cuda.OutOfMemoryError
+            A = adj_mat.T.dot(adj_mat).tocoo()
+
+            item_col_degree = np.sum(A, axis=1).reshape(-1)  # users_D
+            item_row_degree = np.sum(A, axis=0).reshape(-1)  # items_D
+
+            beta_item_colD = (np.sqrt(item_col_degree + 1) / item_col_degree).reshape(-1, 1)  # beta_uD
+            beta_item_rowD = (1 / np.sqrt(item_row_degree + 1)).reshape(1, -1)  # beta_iD
+
+            all_ii_constrain_mat = beta_item_colD.dot(beta_item_rowD)
+
+            ii_neighbors_matrix = torch.from_numpy(A.multiply(all_ii_constrain_mat).todense()).to(self.device)
+            ii_neighbors_sim, ii_neighbors_idxs = torch.topk(ii_neighbors_matrix, k=self.ii_neighbor_num, dim=1)
 
         return ii_neighbors_idxs, ii_neighbors_sim
 

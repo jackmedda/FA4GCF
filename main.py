@@ -251,6 +251,7 @@ if __name__ == "__main__":
     parser.add_argument('--dataset', default='ml-100k')
     parser.add_argument('--config_file_list', nargs='+', default=None)
     parser.add_argument('--model_file', default=None)
+    parser.add_argument('--use_best_params', action='store_true')
     explain_group.add_argument('--explainer_config_file', default=None)
     # explain_group.add_argument('--load', action='store_true')
     explain_group.add_argument('--explain_config_id', default=-1)
@@ -309,11 +310,12 @@ if __name__ == "__main__":
             args.explainer_config_file = explainer_config
 
     if args.run == "train":
-        model_best_config = os.path.join(all_model_configs, f"{args.model}_best.yaml")
-        if os.path.isfile(model_best_config):
-            with open(model_best_config, 'r') as best_conf_file:
-                best_conf_dict = yaml.load(best_conf_file, Loader=Config._build_yaml_loader())
-            config_dict.update(best_conf_dict[args.dataset.lower()])
+        if args.use_best_params:
+            model_best_config = os.path.join(all_model_configs, f"{args.model}_best.yaml")
+            if os.path.isfile(model_best_config):
+                with open(model_best_config, 'r') as best_conf_file:
+                    best_conf_dict = yaml.load(best_conf_file, Loader=Config._build_yaml_loader())
+                config_dict.update(best_conf_dict[args.dataset.lower()])
 
         if args.use_perturbed_graph:
             if args.explainer_config_file:

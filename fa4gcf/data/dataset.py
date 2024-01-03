@@ -1,6 +1,3 @@
-import re
-import yaml
-
 import torch
 from torch_geometric.nn.conv.gcn_conv import gcn_norm
 
@@ -55,22 +52,3 @@ class Dataset(GNNUERS_Dataset):
         edge_index, edge_weight = gcn_norm(edge_index, edge_weight, num_nodes, add_self_loops=add_self_loops)
 
         return edge_index, edge_weight
-
-    @staticmethod
-    def _build_yaml_loader():
-        loader = yaml.FullLoader
-        loader.add_implicit_resolver(
-            "tag:yaml.org,2002:float",
-            re.compile(
-                """^(?:
-             [-+]?(?:[0-9][0-9_]*)\\.[0-9_]*(?:[eE][-+]?[0-9]+)?
-            |[-+]?(?:[0-9][0-9_]*)(?:[eE][-+]?[0-9]+)
-            |\\.[0-9_]+(?:[eE][-+][0-9]+)?
-            |[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\\.[0-9_]*
-            |[-+]?\\.(?:inf|Inf|INF)
-            |\\.(?:nan|NaN|NAN))$""",
-                re.X,
-            ),
-            list("-+0123456789."),
-        )
-        return loader
