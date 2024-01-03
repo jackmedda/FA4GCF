@@ -4,6 +4,10 @@ insurance:
   learning_rate: 2e-4
   temperature: 0.05
 lastfm-1k:
+  eps: 0.2
+  lambda: 0.05
+  learning_rate: 2e-4
+  temperature: 0.1
 ml-1m:
 rent_the_runway:
   eps: 0.1
