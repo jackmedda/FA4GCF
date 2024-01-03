@@ -2,12 +2,24 @@ import os
 import re
 import yaml
 
+from recbole.utils import ModelType
 from recbole.config import Config as Recbole_Config
 
 from fa4gcf.utils import get_model
 
 
 class Config(Recbole_Config):
+
+    def __init__(self, model=None, dataset=None, config_file_list=None, config_dict=None):
+        super(Config, self).__init__(
+            model=model,
+            dataset=dataset,
+            config_file_list=config_file_list,
+            config_dict=config_dict
+        )
+
+        if self["MODEL_TYPE"] == ModelType.TRADITIONAL:
+            self["train_neg_sample_args"]["sample_num"] = 1
 
     def _get_model_and_dataset(self, model, dataset):
         if model is None:

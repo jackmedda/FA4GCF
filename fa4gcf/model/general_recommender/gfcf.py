@@ -39,7 +39,7 @@ class GFCF(GeneralGraphRecommender):
 
         # we convert the resulting vectors to pytorch tensors to allow the perturbation vector to be optimized
         # it does not affect the final computation. The prediction is just performed with pytorch
-        self._gfcf_data_to_tensor()
+        # self._gfcf_data_to_tensor()
 
     def _run_svd(self):
         from sparsesvd import sparsesvd
@@ -106,26 +106,26 @@ class GFCF(GeneralGraphRecommender):
             self.norm_adj = torch.sparse.mm(norm_adj, d_mat)
 
     def _generate_user_rating(self):
-        # U_2 = self.adj_mat @ self.norm_adj.T @ self.norm_adj
-        # U_1 = self.adj_mat @ self.d_mat_i @ self.vt.T @ self.vt @ self.d_mat_i_inv
+        U_2 = self.adj_mat @ self.norm_adj.T @ self.norm_adj
+        U_1 = self.adj_mat @ self.d_mat_i @ self.vt.T @ self.vt @ self.d_mat_i_inv
+
+        self.restore_user_rating = torch.tensor(U_2 + self.alpha * U_1).to(self.device)
+
+        # U_2 = torch.sparse.mm(torch.sparse.mm(self.adj_mat, self.norm_adj.T), self.norm_adj)
+        # U_1 = torch.sparse.mm(
+        #     torch.sparse.mm(
+        #         torch.sparse.mm(
+        #             torch.sparse.mm(
+        #                 torch.sparse.mm(self.adj_mat, self.d_mat_i)
+        #             ),
+        #             self.vt.T
+        #         ),
+        #         self.vt
+        #     ),
+        #     self.d_mat_i_inv
+        # )
         #
-        # self.restore_user_rating = torch.tensor(U_2 + self.alpha * U_1).to(self.device)
-
-        U_2 = torch.sparse.mm(torch.sparse.mm(self.adj_mat, self.norm_adj.T), self.norm_adj)
-        U_1 = torch.sparse.mm(
-            torch.sparse.mm(
-                torch.sparse.mm(
-                    torch.sparse.mm(
-                        torch.sparse.mm(self.adj_mat, self.d_mat_i)
-                    ),
-                    self.vt.T
-                ),
-                self.vt
-            ),
-            self.d_mat_i_inv
-        )
-
-        self.restore_user_rating = U_2 + self.alpha * U_1
+        # self.restore_user_rating = U_2 + self.alpha * U_1
 
     def _gfcf_data_to_tensor(self):
         self.vt = torch.from_numpy(self.vt).to_sparse_coo().to(self.device)

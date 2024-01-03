@@ -168,7 +168,6 @@ def main(model=None,
     """
     # configurations initialization
     config = Config(model=model, dataset=dataset, config_file_list=config_file_list, config_dict=config_dict)
-    config['data_path'] = os.path.join(config.file_config_dict['data_path'], config.dataset)
     seed = seed or config['seed']
     init_seed(seed, config['reproducibility'])
 
