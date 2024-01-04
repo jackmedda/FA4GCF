@@ -2,7 +2,7 @@
 # 'ITEM_ID_FIELD': item_id,
 TIMESTAMP_FIELD: 'timestamp'
 train_batch_size: 4096
-eval_batch_size: 2048
+eval_batch_size: 500000
 load_col: {'inter': ['user_id', 'item_id', 'timestamp']}
 
 # NCL
