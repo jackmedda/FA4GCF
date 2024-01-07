@@ -131,7 +131,8 @@ def recbole_hyper(base_config, params_file, config_file_list, saved=True):
         algo='exhaustive',
         params_file=params_file,
         fixed_config_file_list=config_file_list,
-        early_stop=50 if model_name.lower() == "svd_gcn" else 10
+        early_stop=10,
+        ignore_errors=True
     )
     hp.run()
 
