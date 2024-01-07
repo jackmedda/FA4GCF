@@ -1,0 +1,17 @@
+# SVD-GCN-S: parametric = False
+# if parametric = True:
+#   SVD-GCN-B: user_coefficient = 0, item_coefficient = 0
+#   SVD-GCN-I: user_coefficient = 0, item_coefficient > 0
+#   SVD-GCN-U: user_coefficient > 0, item_coefficient = 0
+#   SVD-GCN-M: user_coefficient > 0, item_coefficient > 0
+embedding_size: 64
+k_singular_values: 90
+alpha: 1.0
+beta: 2.0
+parametric: True
+reg_weight: 0.01
+user_coefficient: 0.5
+item_coefficient: 0.7
+q: 400
+
+# transform: svd_gcn
