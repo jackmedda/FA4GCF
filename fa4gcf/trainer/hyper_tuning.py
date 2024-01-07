@@ -1,3 +1,4 @@
+import hyperopt
 from recbole.trainer import HyperTuning as RecboleHyperTuning
 
 
@@ -12,11 +13,13 @@ class HyperTuning(RecboleHyperTuning):
         params_dict=None,
         fixed_config_file_list=None,
         display_file=None,
+        ignore_errors=False,
         algo="exhaustive",
         max_evals=100,
         early_stop=10,
     ):
         self.model = model
+        self.ignore_errors = ignore_errors
         super(HyperTuning, self).__init__(
             objective_function,
             space=space,
@@ -68,3 +71,12 @@ class HyperTuning(RecboleHyperTuning):
                 else:
                     raise ValueError("Illegal param type [{}]".format(para_type))
         return space
+
+    def trial(self, params):
+        try:
+            return super(HyperTuning, self).trial(params)
+        except Exception as e:
+            if self.ignore_errors:
+                return {"status": hyperopt.STATUS_FAIL}
+            else:
+                raise e

@@ -3,7 +3,8 @@ ITEM_ID_FIELD: 'product_id'
 TIMESTAMP_FIELD: 'timestamp'
 train_batch_size: 4096
 eval_batch_size: 10000000
-load_col: {'inter': ['customer_id', 'product_id']}
+load_col: {'inter': ['customer_id', 'product_id', 'timestamp']}
+unused_col: {'inter': ['timestamp']}
 
 # NCL
 num_clusters: 500

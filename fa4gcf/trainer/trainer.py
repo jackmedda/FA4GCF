@@ -12,8 +12,21 @@ from recbole.utils import early_stopping, dict2str, set_color, get_gpu_usage
 from fa4gcf.model.general_recommender.autocf import LocalGraphSampler, SubgraphRandomMasker
 
 
+class SVD_GCNTrainer(TraditionalTrainer):
+
+    def __init__(self, config, model):
+        super(SVD_GCNTrainer, self).__init__(config, model)
+        if config['parametric']:
+            self.epochs = config['epochs']  # overwrites the single epoch with the value in config
+        else:
+            self.eval_step = 1  # the model is also evaluated on the validation set
+
+
 class GFCFTrainer(TraditionalTrainer):
-    pass
+
+    def __init__(self, config, model):
+        super(GFCFTrainer, self).__init__(config, model)
+        self.eval_step = 1  # the model is also evaluated on the validation set
 
 
 class NCLTrainer(Trainer):

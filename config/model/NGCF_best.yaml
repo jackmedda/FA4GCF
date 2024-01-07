@@ -7,6 +7,9 @@ lastfm-1k:
   message_dropout: 0.0
   node_dropout: 0.1
 ml-1m:
+  learning_rate: 2e-4
+  message_dropout: 0.0
+  node_dropout: 0.0
 rent_the_runway:
   learning_rate: 2e-4
   message_dropout: 0.0

@@ -1,16 +1,167 @@
 import copy
 import yaml
+import warnings
 import importlib
-from typing import Union
+from logging import getLogger
+from typing import Union, Literal
 
 import torch
-try:
-    import torch_sparse
-except ImportError:
-    pass
+from torch_geometric.typing import SparseTensor
+from recbole.sampler import KGSampler
+from recbole.data.dataloader import *
+from recbole.utils import (
+    ModelType,
+    set_color,
+    get_model as get_recbole_model,
+    get_trainer as get_recbole_trainer
+)
+from recbole.data.utils import (
+    load_split_dataloaders,
+    create_samplers,
+    save_split_dataloaders,
+    get_dataloader as get_recbole_dataloader
+)
 
-from recbole.utils import get_model as get_recbole_model
-from recbole.utils import get_trainer as get_recbole_trainer
+from fa4gcf.data.custom_dataloader import SVD_GCNDataLoader
+
+
+def data_preparation(config, dataset):
+    """Split the dataset by :attr:`config['[valid|test]_eval_args']` and create training, validation and test dataloader.
+
+    Note:
+        If we can load split dataloaders by :meth:`load_split_dataloaders`, we will not create new split dataloaders.
+
+    Args:
+        config (Config): An instance object of Config, used to record parameter information.
+        dataset (Dataset): An instance object of Dataset, which contains all interaction records.
+
+    Returns:
+        tuple:
+            - train_data (AbstractDataLoader): The dataloader for training.
+            - valid_data (AbstractDataLoader): The dataloader for validation.
+            - test_data (AbstractDataLoader): The dataloader for testing.
+    """
+    dataloaders = load_split_dataloaders(config)
+    if dataloaders is not None:
+        train_data, valid_data, test_data = dataloaders
+        dataset._change_feat_format()
+    else:
+        model_type = config["MODEL_TYPE"]
+        built_datasets = dataset.build()
+
+        train_dataset, valid_dataset, test_dataset = built_datasets
+        train_sampler, valid_sampler, test_sampler = create_samplers(
+            config, dataset, built_datasets
+        )
+
+        if model_type != ModelType.KNOWLEDGE:
+            train_data = get_dataloader(config, "train")(
+                config, train_dataset, train_sampler, shuffle=config["shuffle"]
+            )
+        else:
+            kg_sampler = KGSampler(
+                dataset,
+                config["train_neg_sample_args"]["distribution"],
+                config["train_neg_sample_args"]["alpha"],
+            )
+            train_data = get_dataloader(config, "train")(
+                config, train_dataset, train_sampler, kg_sampler, shuffle=True
+            )
+
+        valid_data = get_dataloader(config, "valid")(
+            config, valid_dataset, valid_sampler, shuffle=False
+        )
+        test_data = get_dataloader(config, "test")(
+            config, test_dataset, test_sampler, shuffle=False
+        )
+        if config["save_dataloaders"]:
+            save_split_dataloaders(
+                config, dataloaders=(train_data, valid_data, test_data)
+            )
+
+    logger = getLogger()
+    logger.info(
+        set_color("[Training]: ", "pink")
+        + set_color("train_batch_size", "cyan")
+        + " = "
+        + set_color(f'[{config["train_batch_size"]}]', "yellow")
+        + set_color(" train_neg_sample_args", "cyan")
+        + ": "
+        + set_color(f'[{config["train_neg_sample_args"]}]', "yellow")
+    )
+    logger.info(
+        set_color("[Evaluation]: ", "pink")
+        + set_color("eval_batch_size", "cyan")
+        + " = "
+        + set_color(f'[{config["eval_batch_size"]}]', "yellow")
+        + set_color(" eval_args", "cyan")
+        + ": "
+        + set_color(f'[{config["eval_args"]}]', "yellow")
+    )
+    return train_data, valid_data, test_data
+
+
+def get_dataloader(config, phase: Literal["train", "valid", "test", "evaluation"]):
+    """Return a dataloader class according to :attr:`config` and :attr:`phase`.
+
+    Args:
+        config (Config): An instance object of Config, used to record parameter information.
+        phase (str): The stage of dataloader. It can only take 4 values: 'train', 'valid', 'test' or 'evaluation'.
+            Notes: 'evaluation' has been deprecated, please use 'valid' or 'test' instead.
+    Returns:
+        type: The dataloader class that meets the requirements in :attr:`config` and :attr:`phase`.
+    """
+    if phase not in ["train", "valid", "test", "evaluation"]:
+        raise ValueError(
+            "`phase` can only be 'train', 'valid', 'test' or 'evaluation'."
+        )
+    if phase == "evaluation":
+        phase = "test"
+        warnings.warn(
+            "'evaluation' has been deprecated, please use 'valid' or 'test' instead.",
+            DeprecationWarning,
+        )
+
+    register_table = {
+        "SVD_GCN": _get_SVD_GCN_dataloader
+    }
+
+    if config["model"] in register_table:
+        return register_table[config["model"]](config, phase)
+    else:
+        return get_recbole_dataloader(config, phase)
+
+
+def _get_SVD_GCN_dataloader(config, phase: Literal["train", "valid", "test", "evaluation"]):
+    """Customized function for SVD_GCN to get correct dataloader class.
+
+    Args:
+        config (Config): An instance object of Config, used to record parameter information.
+        phase (str): The stage of dataloader. It can only take 4 values: 'train', 'valid', 'test' or 'evaluation'.
+            Notes: 'evaluation' has been deprecated, please use 'valid' or 'test' instead.
+
+    Returns:
+        type: The dataloader class that meets the requirements in :attr:`config` and :attr:`phase`.
+    """
+    if phase not in ["train", "valid", "test", "evaluation"]:
+        raise ValueError(
+            "`phase` can only be 'train', 'valid', 'test' or 'evaluation'."
+        )
+    if phase == "evaluation":
+        phase = "test"
+        warnings.warn(
+            "'evaluation' has been deprecated, please use 'valid' or 'test' instead.",
+            DeprecationWarning,
+        )
+
+    if phase == "train":
+        return SVD_GCNDataLoader
+    else:
+        eval_mode = config["eval_args"]["mode"][phase]
+        if eval_mode == "full":
+            return FullSortEvalDataLoader
+        else:
+            return NegSampleEvalDataLoader
 
 
 def get_model(model_name):
@@ -69,7 +220,7 @@ def get_sorter_indices(base_idxs, to_sort_idxs):
 
 def create_sparse_symm_matrix_from_vec(pert_vector,
                                        pert_index,
-                                       edge_index: Union[torch.Tensor, "torch_sparse.SparseTensor"],
+                                       edge_index: Union[torch.Tensor, SparseTensor],
                                        edge_weight,
                                        num_nodes=None,
                                        edge_deletions=False,
@@ -106,7 +257,7 @@ def create_sparse_symm_matrix_from_vec(pert_vector,
     torch.cuda.empty_cache()
 
     if is_sparse and num_nodes is not None:
-        edge_index = torch_sparse.SparseTensor(
+        edge_index = SparseTensor(
             row=edge_index[0],
             col=edge_index[1],
             value=edge_weight,
@@ -118,7 +269,7 @@ def create_sparse_symm_matrix_from_vec(pert_vector,
 
 
 def edge_index_to_adj_t(edge_index, edge_weight, m_num_nodes, n_num_nodes):
-    adj = torch_sparse.SparseTensor(
+    adj = SparseTensor(
         row=edge_index[0],
         col=edge_index[1],
         value=edge_weight,

@@ -4,6 +4,7 @@ TIMESTAMP_FIELD: 'timestamp'
 train_batch_size: 4096
 eval_batch_size: 500000
 load_col: {'inter': ['user_id', 'item_id', 'timestamp']}
+unused_col: {'inter': ['timestamp']}
 
 # NCL
 num_clusters: 90

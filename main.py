@@ -9,7 +9,6 @@ import logging
 import numpy as np
 import pandas as pd
 from recbole.trainer import TraditionalTrainer
-from recbole.data import data_preparation
 from recbole.utils import init_logger, init_seed, set_color, get_local_time
 
 import fa4gcf.utils as utils
@@ -32,7 +31,7 @@ def training(_config, saved=True, model_file=None, hyper=False, perturbed_datase
         _dataset = perturbed_dataset if perturbed_dataset is not None else Dataset(_config)
 
         # dataset splitting
-        train_data, valid_data, test_data = data_preparation(_config, _dataset)
+        train_data, valid_data, test_data = utils.data_preparation(_config, _dataset)
 
         # model loading and initialization
         _model = utils.get_model(_config['model'])(_config, train_data.dataset).to(_config['device'])
@@ -105,6 +104,12 @@ def training(_config, saved=True, model_file=None, hyper=False, perturbed_datase
 
 
 def recbole_hyper(base_config, params_file, config_file_list, saved=True):
+    model_name = base_config['model']
+    if model_name.lower() == 'svd_gcn':
+        parametric = base_config['parametric'] if base_config['parametric'] is not None else True
+        if not parametric:
+            model_name += '_s'
+
     def objective_function(c_dict, c_file_list):
         config = Config(
             model=base_config['model'],
@@ -117,19 +122,20 @@ def recbole_hyper(base_config, params_file, config_file_list, saved=True):
         logging.basicConfig(level=logging.ERROR)
 
         train_result = training(config, saved=False, hyper=True)
-        train_result['model'] = base_config['model']
+        train_result['model'] = model_name
         return train_result
 
     hp = HyperTuning(
         objective_function,
-        base_config['model'],
+        model_name,
         algo='exhaustive',
         params_file=params_file,
-        fixed_config_file_list=config_file_list
+        fixed_config_file_list=config_file_list,
+        early_stop=50 if model_name.lower() == "svd_gcn" else 10
     )
     hp.run()
 
-    output_path = os.path.join(base_config['checkpoint_dir'], 'hyper', base_config['dataset'], base_config['model'])
+    output_path = os.path.join(base_config['checkpoint_dir'], 'hyper', base_config['dataset'], model_name)
     os.makedirs(output_path, exist_ok=True)
     output_file = os.path.join(output_path, f"{get_local_time()}.txt")
 

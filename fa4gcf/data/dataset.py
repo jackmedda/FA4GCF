@@ -1,4 +1,5 @@
 import torch
+from torch_geometric.typing import torch_sparse
 from torch_geometric.nn.conv.gcn_conv import gcn_norm
 
 from gnnuers.data import Dataset as GNNUERS_Dataset
@@ -22,11 +23,7 @@ class Dataset(GNNUERS_Dataset):
         Returns:
             The normalized interaction matrix in Tensor.
         """
-        try:
-            import torch_sparse
-            self.is_sparse = True
-        except ImportError:
-            self.is_sparse = False
+        self.is_sparse = torch_sparse is not object
 
         row = self.inter_feat[self.uid_field]
         col = self.inter_feat[self.iid_field] + self.user_num
@@ -41,7 +38,7 @@ class Dataset(GNNUERS_Dataset):
         if enable_sparse:
             if not self.is_sparse:
                 self.logger.warning(
-                    "Import `torch_sparse` error, please install corrsponding version of `torch_sparse`."
+                    "Import `torch_sparse` error, please install corresponding version of `torch_sparse`."
                     "Dense edge_index will be used instead of SparseTensor in dataset."
                 )
             else:

@@ -3,6 +3,7 @@ insurance:
 lastfm-1k:
   learning_rate: 2e-4
 ml-1m:
+  learning_rate: 2e-4
 rent_the_runway:
   learning_rate: 2e-4
 tafeng:

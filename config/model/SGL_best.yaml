@@ -7,6 +7,9 @@ lastfm-1k:
   ssl_tau: 0.1
   ssl_weight: 0.01
 ml-1m:
+  learning_rate: 2e-4
+  ssl_tau: 0.1
+  ssl_weight: 0.01
 rent_the_runway:
   learning_rate: 2e-4
   ssl_tau: 0.1

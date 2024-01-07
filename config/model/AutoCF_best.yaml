@@ -7,6 +7,9 @@ lastfm-1k:
   learning_rate: 2e-4
   ssl_reg_weight: 1
 ml-1m:
+  head: 4
+  learning_rate: 2e-4
+  ssl_reg_weight: 1
 rent_the_runway:
   head: 2
   learning_rate: 1e-4
