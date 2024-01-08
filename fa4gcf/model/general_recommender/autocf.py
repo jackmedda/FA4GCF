@@ -75,7 +75,7 @@ class AutoCF(GeneralGraphRecommender):
     def calculate_loss(self, interaction, encoder_edge_index, encoder_edge_weight, decoder_edge_index):
         user = interaction[self.USER_ID]
         pos_item = interaction[self.ITEM_ID]
-        neg_item = interaction[self.NEG_ITEM_ID]  # not used
+        _ = interaction[self.NEG_ITEM_ID]  # not used
 
         user_all_embeddings, item_all_embeddings = self.forward(
             encoder_edge_index, encoder_edge_weight, decoder_edge_index=decoder_edge_index
@@ -84,7 +84,7 @@ class AutoCF(GeneralGraphRecommender):
         pos_embeddings = item_all_embeddings[pos_item]
 
         # calculate BPR loss
-        bpr_loss = (-torch.mul(u_embeddings, pos_embeddings).sum(dim=1)).mean()
+        bpr_loss = (-torch.mul(u_embeddings, pos_embeddings).sum(dim=-1)).mean()
 
         # calculate regularization Loss
         reg_loss = self.reg_loss(self.parameters())
@@ -180,7 +180,7 @@ class LocalGraphSampler(torch.nn.Module):
 
     @staticmethod
     def add_noise(scores):
-        noise = torch.rand(scores.shape).cuda()
+        noise = torch.rand(scores.shape, device=scores.device)
         noise = -torch.log(-torch.log(noise))
         return torch.log(scores) + noise
 
@@ -263,7 +263,7 @@ class SubgraphRandomMasker(torch.nn.Module):
                 mask_nodes.append(next_seeds)
 
         sample_num = int(self.num_all * self.keep_rate)
-        sampled_nodes = torch.randint(self.num_all, size=[sample_num]).cuda()
+        sampled_nodes = torch.randint(self.num_all, size=[sample_num]).to(values.device)
 
         mask_nodes.append(sampled_nodes)
         mask_nodes = torch.unique(torch.concat(mask_nodes))

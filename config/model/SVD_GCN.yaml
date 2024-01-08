@@ -13,5 +13,3 @@ reg_weight: 0.01
 user_coefficient: 0.5
 item_coefficient: 0.7
 q: 400
-
-# transform: svd_gcn

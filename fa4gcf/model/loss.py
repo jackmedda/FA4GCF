@@ -9,17 +9,12 @@ class ContrastiveLoss(nn.Module):
         super(ContrastiveLoss, self).__init__()
 
     def forward(self, nodes, nodes_embeddings, other_nodes_embeddings=None):
-        if other_nodes_embeddings is not None:
-            nodes_embeddings = nodes_embeddings[nodes]
-            scores = torch.log(
-                torch.exp(nodes_embeddings.mm(other_nodes_embeddings.T)).sum(-1)
-            ).mean()
-        else:
-            unique_nodes = torch.unique(nodes)
-            nodes_embeddings = nodes_embeddings[unique_nodes]
-            scores = torch.log(
-                torch.exp(nodes_embeddings.mm(nodes_embeddings.T)).sum(-1)
-            ).mean()
+        if other_nodes_embeddings is None:
+            nodes = torch.unique(nodes)
+            other_nodes_embeddings = nodes_embeddings
+
+        nodes_embeddings = nodes_embeddings[nodes]
+        scores = torch.logsumexp(nodes_embeddings.mm(other_nodes_embeddings.T), dim=-1).mean()
 
         return scores
 
