@@ -108,7 +108,7 @@ def recbole_hyper(base_config, params_file, config_file_list, saved=True):
     if model_name.lower() == 'svd_gcn':
         parametric = base_config['parametric'] if base_config['parametric'] is not None else True
         if not parametric:
-            model_name += '_s'
+            model_name += '_S'
 
     def objective_function(c_dict, c_file_list):
         config = Config(
@@ -321,7 +321,21 @@ if __name__ == "__main__":
             if os.path.isfile(model_best_config):
                 with open(model_best_config, 'r') as best_conf_file:
                     best_conf_dict = yaml.load(best_conf_file, Loader=Config._build_yaml_loader())
-                config_dict.update(best_conf_dict[args.dataset.lower()])
+                if args.model.lower() == "svd_gcn":
+                    # handles best_params for SVD_GCN or SVD_GCN_S
+                    parametric = None
+                    for conf_arg in args.config_file_list:
+                        with open(conf_arg, 'r') as conf_arg_file:
+                            conf_arg_dict = yaml.load(conf_arg_file, Loader=Config._build_yaml_loader())
+                        if 'parametric' in conf_arg_dict:
+                            parametric = conf_arg_dict['parametric']
+
+                    if parametric is None:
+                        raise ValueError("`parametric` was not set for SVD_GCN using best_params")
+
+                    best_conf_dict = best_conf_dict[parametric]
+                else:
+                    config_dict.update(best_conf_dict[args.dataset.lower()])
 
         if args.use_perturbed_graph:
             if args.explainer_config_file:
