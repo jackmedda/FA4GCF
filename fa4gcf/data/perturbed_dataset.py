@@ -3,10 +3,14 @@ from torch_geometric.nn.conv.gcn_conv import gcn_norm
 
 from gnnuers.data import PerturbedDataset as GNNUERS_PerturbedDataset
 
-import fa4gcf.utils as utils
+import fa4gcf.data.utils as utils
 
 
 class PerturbedDataset(GNNUERS_PerturbedDataset):
+
+    @staticmethod
+    def edge_index_to_adj_t(edge_index, edge_weight, m_num_nodes, n_num_nodes):
+        return utils.edge_index_to_adj_t(edge_index, edge_weight, m_num_nodes, n_num_nodes)
 
     def get_norm_adj_mat(self, enable_sparse=False):
         r"""Get the normalized interaction matrix of users and items.
@@ -38,7 +42,7 @@ class PerturbedDataset(GNNUERS_PerturbedDataset):
                     "Dense edge_index will be used instead of SparseTensor in dataset."
                 )
             else:
-                adj_t = utils.edge_index_to_adj_t(edge_index, edge_weight, num_nodes, num_nodes)
+                adj_t = self.edge_index_to_adj_t(edge_index, edge_weight, num_nodes, num_nodes)
                 adj_t = gcn_norm(adj_t, None, num_nodes, add_self_loops=False)
                 return adj_t, None
 

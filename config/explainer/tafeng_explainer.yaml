@@ -1,10 +1,10 @@
 # learning rate of optimizer for explainer
-cf_learning_rate: 85000 # 3000 (deletion) / 65000 (addition) for NDCGApprox, 300 (deletion) for SoftmaxLoss
+cf_learning_rate: 85000 # 3000 (deletion) / 65000 (addition) for NDCGApprox, 300 (deletion) for SigmoidBCELoss
 
 # how many users should be considered to explain?
 user_batch_exp: 192
 # loss weight for the graph dist loss
-cf_beta: 0.5  # 0.01 for NDCGApproxLoss, 4.0 for SoftmaxLoss
+cf_beta: 0.5  # 0.01 for NDCGApproxLoss, 4.0 for SigmoidBCELoss
 
 # sensitive attributes to be used in the fairness losses and for following analysis
 sensitive_attribute: age

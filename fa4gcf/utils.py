@@ -1,12 +1,12 @@
+import os
 import copy
 import yaml
 import warnings
 import importlib
 from logging import getLogger
-from typing import Union, Literal
+from typing import Literal
 
 import torch
-from torch_geometric.typing import SparseTensor
 from recbole.sampler import KGSampler
 from recbole.data.dataloader import *
 from recbole.utils import (
@@ -22,7 +22,100 @@ from recbole.data.utils import (
     get_dataloader as get_recbole_dataloader
 )
 
+from fa4gcf.data import Dataset
 from fa4gcf.data.custom_dataloader import SVD_GCNDataLoader
+
+
+def load_data_and_model(model_file, explainer_config=None, cmd_config_args=None, perturbed_dataset=None):
+    r"""Load filtered dataset, split dataloaders and saved model.
+    Args:
+        model_file (str): The path of saved model file.
+    Returns:
+        tuple:
+            - config (Config): An instance object of Config, which record parameter information in :attr:`model_file`.
+            - model (AbstractRecommender): The model load from :attr:`model_file`.
+            - dataset (Dataset): The filtered dataset.
+            - train_data (AbstractDataLoader): The dataloader for training.
+            - valid_data (AbstractDataLoader): The dataloader for validation.
+            - test_data (AbstractDataLoader): The dataloader for testing.
+    """
+    checkpoint = torch.load(model_file)
+    config = checkpoint['config']
+
+    if explainer_config is not None:
+        if isinstance(explainer_config, str):
+            with open(explainer_config, 'r', encoding='utf-8') as f:
+                explain_config_dict = yaml.load(f.read(), Loader=config.yaml_loader)
+        elif isinstance(explainer_config, dict):
+            explain_config_dict = explainer_config
+        else:
+            raise ValueError(f'explainer_config cannot be `{type(explainer_config)}`. Only `str` and `dict` are supported')
+
+        config.final_config_dict.update(explain_config_dict)
+
+    if cmd_config_args is not None:
+        for arg, val in cmd_config_args.items():
+            conf = config
+            if '.' in arg:
+                subargs = arg.split('.')
+                for subarg in subargs[:-1]:
+                    conf = conf[subarg]
+                arg = subargs[-1]
+
+            if conf[arg] is None:
+                try:
+                    new_val = float(val)
+                    new_val = int(new_val) if new_val.is_integer() else new_val
+                except ValueError:
+                    new_val = int(val) if val.isdigit() else val
+                conf[arg] = new_val
+            else:
+                try:
+                    arg_type = type(conf[arg])
+                    if arg_type == bool:
+                        new_val = val.title() == 'True'
+                    else:
+                        new_val = arg_type(val)  # cast to same type in config
+                    conf[arg] = new_val
+                except (ValueError, TypeError):
+                    warnings.warn(f"arg [{arg}] taken from cmd not valid for explainer config file")
+
+    config['data_path'] = config['data_path'].replace('\\', os.sep)
+    # config['device'] = torch.device('cuda')
+
+    logger = getLogger()
+    logger.info(config)
+
+    if perturbed_dataset is not None:
+        dataset = perturbed_dataset
+    else:
+        dataset = Dataset(config)
+        default_file = os.path.join(config['checkpoint_dir'], f'{config["dataset"]}-{dataset.__class__.__name__}.pth')
+        file = config['dataset_save_path'] or default_file
+        if os.path.exists(file):
+            with open(file, 'rb') as f:
+                dataset = pickle.load(f)
+            dataset_args_unchanged = True
+            for arg in dataset_arguments + ['seed', 'repeatable']:
+                if config[arg] != dataset.config[arg]:
+                    dataset_args_unchanged = False
+                    break
+            if dataset_args_unchanged:
+                logger.info(set_color('Load filtered dataset from', 'pink') + f': [{file}]')
+
+        if config['save_dataset']:
+            dataset.save()
+
+    logger.info(dataset)
+
+    config["train_neg_sample_args"]['sample_num'] = 1  # deactivate negative sampling
+    train_data, valid_data, test_data = data_preparation(config, dataset)
+
+    model = get_model(config['model'])(config, train_data.dataset).to(config['device'])
+    model.load_state_dict(checkpoint['state_dict'])
+    model.load_other_parameter(checkpoint.get('other_parameter'))
+
+    return config, model, dataset, train_data, valid_data, test_data
 
 
 def data_preparation(config, dataset):
@@ -202,77 +295,3 @@ def get_trainer(model_type, model_name):
         return getattr(importlib.import_module('fa4gcf.trainer.trainer'), model_name + 'Trainer')
     except AttributeError:
         return get_recbole_trainer(model_type, model_name)
-
-
-def is_symmetrically_sorted(idxs: torch.Tensor):
-    assert idxs.shape[0] == 2
-    symm_offset = idxs.shape[1] // 2
-    return (idxs[:, :symm_offset] == idxs[[1, 0], symm_offset:]).all()
-
-
-def get_sorter_indices(base_idxs, to_sort_idxs):
-    unique, inverse = torch.cat((base_idxs, to_sort_idxs), dim=1).unique(dim=1, return_inverse=True)
-    inv_base, inv_to_sort = torch.split(inverse, to_sort_idxs.shape[1])
-    sorter = torch.arange(to_sort_idxs.shape[1], device=inv_to_sort.device)[torch.argsort(inv_to_sort)]
-
-    return sorter, inv_base
-
-
-def create_sparse_symm_matrix_from_vec(pert_vector,
-                                       pert_index,
-                                       edge_index: Union[torch.Tensor, SparseTensor],
-                                       edge_weight,
-                                       num_nodes=None,
-                                       edge_deletions=False,
-                                       mask_filter=None):
-    is_sparse = False
-    if edge_weight is None:
-        is_sparse = True
-        if not edge_index.is_coalesced():
-            edge_index = edge_index.coalesce()
-        num_nodes = edge_index.sparse_size(dim=0) if num_nodes is None else num_nodes
-        row, col, edge_weight = edge_index.coo()
-        edge_index = torch.stack([row, col], dim=0)
-
-    if not edge_deletions:  # if pass is edge additions
-        pert_vector_mask = pert_vector != 0  # reduces memory footprint
-
-        pert_index = pert_index[:, pert_vector_mask]
-        pert_vector = pert_vector[pert_vector_mask]
-        del vector_zeros_mask
-        torch.cuda.empty_cache()
-
-        edge_index = edge_index.to(pert_vector.device)
-        pert_index = pert_index.to(pert_vector.device)
-        edge_index = torch.cat((edge_index, pert_index, pert_index[[1, 0]]), dim=1)
-        edge_weight = torch.cat((edge_weight, pert_vector, pert_vector))
-    else:
-        pert_vector = torch.cat((pert_vector, pert_vector))
-        if mask_filter is not None:
-            sorter, pert_index_inv = get_sorter_indices(pert_index, edge_index)
-            edge_weight = edge_weight[sorter][pert_index_inv]
-            assert is_symmetrically_sorted(edge_index[:, sorter][:, pert_index_inv])
-            edge_weight[mask_filter] = pert_vector
-
-    torch.cuda.empty_cache()
-
-    if is_sparse and num_nodes is not None:
-        edge_index = SparseTensor(
-            row=edge_index[0],
-            col=edge_index[1],
-            value=edge_weight,
-            sparse_sizes=(num_nodes, num_nodes)
-        ).t()
-        edge_weight = None
-
-    return edge_index, edge_weight
-
-
-def edge_index_to_adj_t(edge_index, edge_weight, m_num_nodes, n_num_nodes):
-    adj = SparseTensor(
-        row=edge_index[0],
-        col=edge_index[1],
-        value=edge_weight,
-        sparse_sizes=(m_num_nodes, n_num_nodes)
-    )
-    return adj.t()

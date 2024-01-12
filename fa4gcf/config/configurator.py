@@ -53,7 +53,7 @@ class Config(Recbole_Config):
     def update_base_explainer(self, explainer_config_file=None):
         current_file = os.path.dirname(os.path.realpath(__file__))
         base_explainer_config_file = os.path.join(
-            current_file, os.pardir, os.pardir, os.pardir, "config", "explainer", "base_explainer.yaml"
+            current_file, os.pardir, os.pardir, "config", "explainer", "base_explainer.yaml"
         )
         with open(base_explainer_config_file, 'r', encoding='utf-8') as f:
             config_dict = yaml.load(f.read(), Loader=self.yaml_loader)

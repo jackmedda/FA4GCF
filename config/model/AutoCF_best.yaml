@@ -15,3 +15,6 @@ rent_the_runway:
   learning_rate: 1e-4
   ssl_reg_weight: 1
 tafeng:
+  head: 2
+  learning_rate: 1e-4
+  ssl_reg_weight: 1

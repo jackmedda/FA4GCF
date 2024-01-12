@@ -31,3 +31,10 @@ rent_the_runway:
   w3: 1e-7
   w4: 1e-7
 tafeng:
+  ILoss_lambda: 1e-7
+  learning_rate: 1e-4
+  negative_weight: 10
+  w1: 1.0
+  w2: 1.0
+  w3: 1.0
+  w4: 1.0

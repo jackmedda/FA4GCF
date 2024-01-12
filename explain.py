@@ -16,6 +16,7 @@ from recbole.data.dataloader import FullSortEvalDataLoader
 
 import gnnuers.utils as utils
 
+from fa4gcf.utils import load_data_and_model
 from fa4gcf.trainer import PerturbationTrainer
 
 
@@ -73,7 +74,6 @@ def get_base_exps_filepath(config,
                 elif hyper:
                     config_id = os.path.join(base_exps_file, str(path_c))
                     break
-
 
         base_exps_file = os.path.join(base_exps_file, str(config_id))
     else:
@@ -138,6 +138,9 @@ def perturb(config, model, _rec_data, _full_dataset, _train_data, _valid_data, _
         **kwargs
     )
     perturbation_trainer.set_checkpoint_path(checkpoint_path)
+    logging.getLogger().info("Rec Evaluation data for optimization of PerturbationTrainer")
+    logging.getLogger().info(_rec_data.dataset)
+
     exp, users_order, model_preds = perturbation_trainer.explain(
         user_data,
         _full_dataset,
@@ -286,10 +289,10 @@ def execute_explanation(pre_config,
                         cmd_config_args=None,
                         hyperoptimization=False,
                         overwrite=False):
-    explainer_config = pre_config.get_explainer_config_file(explainer_config_file)
+    explainer_config = pre_config.update_base_explainer(explainer_config_file)
 
     # load trained model, config, dataset
-    config, model, dataset, train_data, valid_data, test_data = utils.load_data_and_model(
+    config, model, dataset, train_data, valid_data, test_data = load_data_and_model(
         model_file,
         explainer_config,
         cmd_config_args=cmd_config_args

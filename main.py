@@ -57,8 +57,8 @@ def training(_config, saved=True, model_file=None, hyper=False, perturbed_datase
         resume_perturbed_training = False
         for f in os.scandir(explanations_path):
             if _config['model'].lower() in f.name.lower() and \
-               _config['dataset'].lower() in f.name.lower() and \
-               perturbed_suffix in f.name:
+                    _config['dataset'].lower() in f.name.lower() and \
+                    perturbed_suffix in f.name:
                 perturbed_model_path = f.path
                 resume_perturbed_training = True
                 break
@@ -186,7 +186,8 @@ def main(model=None,
     #         utils.load_data_and_model(args.original_model_file, args.explainer_config_file)
 
     if args.use_perturbed_graph:
-        import torch; torch.use_deterministic_algorithms(True)
+        import torch;
+        torch.use_deterministic_algorithms(True)
         perturbed_dataset = PerturbedDataset(config, args.explanations_path, args.best_exp)
         if args.run == 'train':
             training(config, saved=saved, model_file=args.model_file, perturbed_dataset=perturbed_dataset)
@@ -228,7 +229,8 @@ def main(model=None,
         if args.run == 'train':
             training(config, saved=saved, model_file=args.model_file)
         elif args.run == 'explain':
-            import torch; torch.use_deterministic_algorithms(True)
+            import torch;
+            torch.use_deterministic_algorithms(True)
             execute_explanation(config, args.model_file, *explain_args)
         elif args.run == 'recbole_hyper':
             config['seed'] = seed
@@ -293,7 +295,8 @@ if __name__ == "__main__":
 
     base_config = os.path.join(current_file, "config", "base_config.yaml")
     if os.path.isfile(base_config):
-        args.config_file_list = [base_config] if args.config_file_list is None else [base_config] + args.config_file_list
+        args.config_file_list = [base_config] if args.config_file_list is None else [
+                                                                                        base_config] + args.config_file_list
 
     all_dataset_configs = os.path.join(current_file, "config", "dataset")
     dataset_config = os.path.join(all_dataset_configs, f"{args.dataset.lower()}.yaml")
@@ -308,12 +311,28 @@ if __name__ == "__main__":
     if os.path.isfile(model_config):
         args.config_file_list.append(model_config)
 
-    if args.run == "explain" and args.explainer_config_file is None:
-        all_explainer_configs = os.path.join(current_file, "config", "explainer")
-        explainer_config = os.path.join(all_explainer_configs, f"{args.dataset.lower()}_explainer.yaml")
+    if args.run == "explain":
+        if args.explainer_config_file is None:
+            all_explainer_configs = os.path.join(current_file, "config", "explainer")
+            explainer_config = os.path.join(all_explainer_configs, f"{args.dataset.lower()}_explainer.yaml")
 
-        if os.path.isfile(explainer_config):
-            args.explainer_config_file = explainer_config
+            if os.path.isfile(explainer_config):
+                args.explainer_config_file = explainer_config
+
+        if args.model_file is None:
+            saved_models_path = os.path.join(current_file, "saved")
+            maybe_model_file = [
+                f for f in os.listdir(saved_models_path)
+                if args.dataset.lower() in f.lower() and
+                   args.model.lower() in f.lower() and
+                   f.endswith('.pth')
+            ]
+            if len(maybe_model_file) == 1:
+                args.model_file = os.path.join(saved_models_path, maybe_model_file[0])
+            else:
+                raise FileNotFoundError(
+                    f'`model_file` is None and no unique {args.model} trained on {args.dataset} found'
+                )
 
     if args.run == "train":
         if args.use_best_params:

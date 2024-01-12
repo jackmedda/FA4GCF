@@ -15,3 +15,6 @@ rent_the_runway:
   learning_rate: 2e-4
   ori_temp: 0.5
 tafeng:
+  activation_function: elu
+  learning_rate: 1e-4
+  ori_temp: 0.7

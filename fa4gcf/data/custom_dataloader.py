@@ -74,6 +74,9 @@ class NegSampleUserItemNeighborDataLoader(TrainDataLoader):
         if distribution == 'multinomial':
             # neg neighbor sampling always works thanks to the padding user/item
             sampled_data = torch.multinomial(data_matrix[inter_data], self.times, True).squeeze()
+            if sampled_data.dim() > 2:
+                print("MULTINOMIAL DISTRIBUTION OUTCOME HAS MORE THAN 2 DIMS")
+                import pdb; pdb.set_trace()
             sampled_data = sampled_data.T.flatten()
         else:
             raise NotImplementedError(
