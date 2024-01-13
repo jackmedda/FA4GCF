@@ -23,9 +23,9 @@ class PerturbationApplier:
         }
 
     def get_applier(self, model):
-        applier_key = model.__name__
+        applier_key = model.__class__.__name__
         if applier_key not in self._model2applier:
-            # No specific applier support for model [{model.__name__}]", using the generic one
+            # No specific applier support for model [{model.__class__.__name__}]", using the generic one
             applier_key = self.GENERIC_APPLIER_KEY
         else:
             model_class = self._model2class[applier_key]
