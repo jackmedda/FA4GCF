@@ -118,6 +118,7 @@ def recbole_hyper(base_config, params_file, config_file_list, saved=True):
             config_dict=c_dict
         )
         config['data_path'] = os.path.join(base_config.file_config_dict['data_path'], base_config.dataset)
+        config['train_neg_sample_args']['sample_num'] = 1  # hyper-optimization is performed with 1 negative sample
         init_seed(base_config['seed'], config['reproducibility'])
         logging.basicConfig(level=logging.ERROR)
 
