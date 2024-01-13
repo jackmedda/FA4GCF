@@ -352,7 +352,7 @@ if __name__ == "__main__":
                     if parametric is None:
                         raise ValueError("`parametric` was not set for SVD_GCN using best_params")
 
-                    best_conf_dict = best_conf_dict[parametric]
+                    best_conf_dict = best_conf_dict[args.dataset.lower()][parametric]
                 else:
                     config_dict.update(best_conf_dict[args.dataset.lower()])
 

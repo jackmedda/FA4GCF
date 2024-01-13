@@ -7,10 +7,12 @@ import gnnuers.models.utils as model_utils
 import gnnuers.explainers.utils as pert_utils
 
 import fa4gcf.data.utils as data_utils
+from fa4gcf.model.perturbed_recommender.customized_perturbation import PerturbationApplier
 from fa4gcf.model.general_recommender import (
     DirectAU,
     LightGCL,
-    GFCF
+    GFCF,
+    SVD_GCN
 )
 
 
@@ -47,6 +49,10 @@ class PygPerturbedModel(RecboleModel):
                 device=self.inner_pyg_model.device
             )
 
+        gcn_norm_kwargs = {}
+        if isinstance(self.inner_pyg_model, SVD_GCN):
+            gcn_norm_kwargs['alpha'] = self.inner_pyg_model.alpha
+
         self.graph_perturbation_layer = GraphPerturbation(
             config,
             dataset,
@@ -55,8 +61,10 @@ class PygPerturbedModel(RecboleModel):
             filtered_users=filtered_users,
             filtered_items=filtered_items,
             random_perturbation=random_perturbation,
-            add_self_loops=dataset.add_self_loops
+            add_self_loops=dataset.add_self_loops,
+            gcn_norm_kwargs=gcn_norm_kwargs
         )
+        self.perturbation_applier = PerturbationApplier()
 
     def cf_state_dict(self):
         return self.graph_perturbation_layer.cf_state_dict()
@@ -122,32 +130,7 @@ class PygPerturbedModel(RecboleModel):
         :return:
         """
         pert_edge_index, pert_edge_weight = self.graph_perturbation_layer(pred=pred)
-        # pert_edge_index, pert_edge_weight = self.perturb_adj_matrix(pred=pred)
-        if isinstance(self.inner_pyg_model, DirectAU):
-            self.inner_pyg_model.encoder.edge_index = pert_edge_index
-            self.inner_pyg_model.encoder.edge_weight = pert_edge_weight
-
-            # the DirectAU forward process simply gets the encoder embeddings, so they must be restored as well
-            import pdb; pdb.set_trace()  # it is probably not needed to restore user_e and item_e of the encoder
-            self.inner_pyg_model.encoder.restore_user_e, self.inner_pyg_model.encoder.restore_item_e = None, None
-        elif isinstance(self.inner_pyg_model, GFCF):
-            if pert_edge_weight is None:
-                adj_mat = pert_edge_index.to_torch_sparse_coo_tensor()
-            else:
-                adj_mat = torch.sparse_coo_tensor(
-                    pert_edge_index, pert_edge_weight, (self.num_all, self.num_all)
-                )
-            self.inner_pyg_model.adj_mat = adj_mat
-            self._generate_gfcf_data()
-        else:
-            self.inner_pyg_model.edge_index = pert_edge_index
-            self.inner_pyg_model.edge_weight = pert_edge_weight
-
-        if hasattr(self.inner_pyg_model, "restore_user_e") and hasattr(self.inner_pyg_model, "restore_item_e"):
-            self.inner_pyg_model.restore_user_e, self.inner_pyg_model.restore_item_e = None, None
-
-        if hasattr(self.inner_pyg_model, "restore_user_rating"):
-            self.inner_pyg_model.restore_user_rating = None
+        self.perturbation_applier.apply(self.inner_pyg_model, pert_edge_index, pert_edge_weight)
 
     def predict(self, interaction, pred=False):
         self.forward(pred=pred)
@@ -168,7 +151,8 @@ class GraphPerturbation(torch.nn.Module):
                  filtered_users=None,
                  filtered_items=None,
                  random_perturbation=False,
-                 add_self_loops=False):
+                 add_self_loops=False,
+                 gcn_norm_kwargs=None):
         super(GraphPerturbation, self).__init__()
 
         self.edge_additions = config['edge_additions']
@@ -176,6 +160,7 @@ class GraphPerturbation(torch.nn.Module):
         self.random_perturb_rs = np.random.RandomState(config['seed'] or 0)
         self.initialization = config['perturbation_initialization']
         self.add_self_loops = add_self_loops
+        self.gcn_norm_kwargs = gcn_norm_kwargs or {}
 
         self.num_all = dataset.user_num + dataset.item_num
 
@@ -391,17 +376,19 @@ class GraphPerturbation(torch.nn.Module):
         # Graph normalization
         if pert_edge_weight is None:
             pert_edge_index = differentiable_gcn_norm(
-                pert_edge_index, None, self.num_all, add_self_loops=self.add_self_loops
+                pert_edge_index, None, self.num_all,
+                add_self_loops=self.add_self_loops, **self.gcn_norm_kwargs
             )
         else:
             pert_edge_index, pert_edge_weight = differentiable_gcn_norm(
-                pert_edge_index, pert_edge_weight, self.num_all, add_self_loops=self.add_self_loops
+                pert_edge_index, pert_edge_weight, self.num_all,
+                add_self_loops=self.add_self_loops, **self.gcn_norm_kwargs
             )
 
         return pert_edge_index, pert_edge_weight
 
 
-def differentiable_gcn_norm(edge_index, edge_weight=None, num_nodes=None, improved=False,
+def differentiable_gcn_norm(edge_index, edge_weight=None, num_nodes=None, improved=False, alpha=0,
                             add_self_loops=True, flow="source_to_target", dtype=None):
     from torch_geometric.typing import torch_sparse
     from torch_geometric.utils import add_remaining_self_loops
@@ -427,6 +414,7 @@ def differentiable_gcn_norm(edge_index, edge_weight=None, num_nodes=None, improv
             adj_t = torch_sparse.fill_diag(adj_t, fill_value)
 
         deg = torch_sparse.sum(adj_t, dim=1) + 1e-7  # avoids NaN in backpropagation
+        deg += alpha  # specific of some models (e.g., SVD_GCN)
         deg_inv_sqrt = deg.pow_(-0.5)
         deg_inv_sqrt.masked_fill_(deg_inv_sqrt == float('inf'), 0.)
         adj_t = torch_sparse.mul(adj_t, deg_inv_sqrt.view(-1, 1))
@@ -449,6 +437,7 @@ def differentiable_gcn_norm(edge_index, edge_weight=None, num_nodes=None, improv
         col, row = edge_index[0], edge_index[1]
 
         deg = scatter(value, col, 0, dim_size=num_nodes, reduce='sum') + 1e-7  # avoids NaN in backpropagation
+        deg += alpha  # specific of some models (e.g., SVD_GCN)
         deg_inv_sqrt = deg.pow_(-0.5)
         deg_inv_sqrt.masked_fill_(deg_inv_sqrt == float('inf'), 0)
         value = deg_inv_sqrt[row] * value * deg_inv_sqrt[col]
@@ -469,6 +458,7 @@ def differentiable_gcn_norm(edge_index, edge_weight=None, num_nodes=None, improv
     row, col = edge_index[0], edge_index[1]
     idx = col if flow == 'source_to_target' else row
     deg = scatter(edge_weight, idx, dim=0, dim_size=num_nodes, reduce='sum') + 1e-7  # avoids NaN in backpropagation
+    deg += alpha  # specific of some models (e.g., SVD_GCN)
     deg_inv_sqrt = deg.pow_(-0.5)
     deg_inv_sqrt.masked_fill_(deg_inv_sqrt == float('inf'), 0)
     edge_weight = deg_inv_sqrt[row] * edge_weight * deg_inv_sqrt[col]

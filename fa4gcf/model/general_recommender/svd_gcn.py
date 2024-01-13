@@ -61,35 +61,53 @@ class SVD_GCN(GeneralGraphRecommender):
         self.NEIGHBOR_ITEM_ID = config["NEIGHBOR_ITEM_ID"]
         self.NEG_NEIGHBOR_ITEM_ID = config["NEG_NEIGHBOR_ITEM_ID"]
 
-        # To make a more accurate SVD, q should be (slightly) larger than k_singular_values. q=400 as set by authors
-        # However, a value of q that is too close to the number of users and items could cause inf values and nan loss
-        q = config['q'] or 400
-        if q > min(self.n_users, self.n_items):  # cannot work svd_lowrank if q is greater than number of users or items
-            q = min(self.n_users, self.n_items)
-            q = q // 2  # makes q lower than the number of users or items
-            self.logger.warning(f"q for SVD_GCN is larger than the number of users or items. q set to {q}")
-            if q < self.k_singular_values:
-                self.logger.warning(
-                    "To make a more accurate SVD, q should be (slightly) larger than k_singular_values. "
-                    "k_singular_values will now be set equal to q - 1 to correctly perform the model training"
-                )
-                self.k_singular_values = q - 1
+        q = self._update_q(config)
 
         # generate approximated SVD
+        self.rate_matrix = self.get_rate_matrix(dataset)
+        U, value, V = self.get_svd(q)
+
+        weighted_value = self._apply_value_weight(value)
+
+        self.user_vector = U * weighted_value
+        self.item_vector = V * weighted_value
+
+        # define layers and loss
+        self.mf_loss = BPRLoss()
+        self.W = self._init_params()
+
+    def _init_params(self):
+        if self.parametric:
+            W = torch.nn.Parameter(torch.randn(self.k_singular_values, self.embedding_size, device=self.device))
+
+            # parameters initialization
+            torch.nn.init.uniform_(
+                W,
+                a=-np.sqrt(6. / (self.k_singular_values + self.embedding_size)),
+                b=np.sqrt(6. / (self.k_singular_values + self.embedding_size))
+            )
+        else:
+            W = torch.nn.Parameter(torch.zeros(1))  # fake_loss
+
+        return W
+
+    def get_rate_matrix(self, dataset):
         inter_matrix = dataset.inter_matrix(form="coo")
-        self.rate_matrix = torch.sparse_coo_tensor(
+        rate_matrix = torch.sparse_coo_tensor(
             torch.stack((torch.from_numpy(inter_matrix.row), torch.from_numpy(inter_matrix.col)), dim=0),
             torch.from_numpy(inter_matrix.data).float(),  # to float32
             size=inter_matrix.shape,
             device=self.device
         )
         del inter_matrix
-        svd_gcn_norm(self.rate_matrix, alpha=self.alpha)
+        return svd_gcn_norm(rate_matrix, alpha=self.alpha)
 
+    def get_svd(self, q):
         U, value, V = torch.svd_lowrank(self.rate_matrix, q=q, niter=30)
 
-        U, value, V = U[:, :self.k_singular_values], value[:self.k_singular_values], V[:, :self.k_singular_values]
+        return U[:, :self.k_singular_values], value[:self.k_singular_values], V[:, :self.k_singular_values]
 
+    def _apply_value_weight(self, value):
         weighted_value = value
         while True and self.beta != 0:
             # the exp of the singular values could lead to inf with torch.float32, so we take half of beta
@@ -100,22 +118,27 @@ class SVD_GCN(GeneralGraphRecommender):
                 self.logger.warning(f"SVD_GCN beta = {self.beta} leads to inf values. Reduced by half")
                 self.beta /= 2
 
-        self.user_vector = U * weighted_value
-        self.item_vector = V * weighted_value
+        return weighted_value
 
-        # define layers and loss
-        self.mf_loss = BPRLoss()
-        if self.parametric:
-            self.W = torch.nn.Parameter(torch.randn(self.k_singular_values, self.embedding_size, device=self.device))
+    def _update_q(self, config):
+        """
+        To make a more accurate SVD, q should be (slightly) larger than k_singular_values. q=400 as set by authors
+        However, a value of q that is too close to the number of users and items could cause inf values and nan loss
+        """
+        q = config['q'] or 400
 
-            # parameters initialization
-            torch.nn.init.uniform_(
-                self.W,
-                a=-np.sqrt(6. / (self.k_singular_values + self.embedding_size)),
-                b=np.sqrt(6. / (self.k_singular_values + self.embedding_size))
-            )
-        else:
-            self.W = torch.nn.Parameter(torch.zeros(1))  # fake_loss
+        # svd_lowrank does not work if q is greater than the number of users or items
+        if q > min(self.n_users, self.n_items):
+            q = min(self.n_users, self.n_items)
+            q = q // 2  # makes q lower than the number of users or items
+            self.logger.warning(f"q for SVD_GCN is larger than the number of users or items. q set to {q}")
+            if q < self.k_singular_values:
+                self.logger.warning(
+                    "To make a more accurate SVD, q should be (slightly) larger than k_singular_values. "
+                    "k_singular_values will now be set equal to q - 1 to correctly perform the model training"
+                )
+                self.k_singular_values = q - 1
+        return q
 
     def forward(self):
         if self.parametric:

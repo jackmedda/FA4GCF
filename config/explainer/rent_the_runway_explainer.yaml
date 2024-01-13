@@ -1,5 +1,5 @@
 # learning rate of optimizer for explainer
-cf_learning_rate: 10000 # 3000 (deletion) / 65000 (addition) for NDCGApprox, 300 (deletion) for SigmoidBCELoss
+cf_learning_rate: 40000 # 3000 (deletion) / 65000 (addition) for NDCGApprox, 300 (deletion) for SigmoidBCELoss
 
 # how many users should be considered to explain?
 user_batch_exp: 48

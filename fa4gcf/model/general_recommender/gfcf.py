@@ -55,55 +55,55 @@ class GFCF(GeneralGraphRecommender):
         return torch.nn.Parameter(torch.zeros(1))
 
     def _generate_gfcf_data(self):
-        if self.training:
-            adj_mat = self.adj_mat
-            rowsum = np.array(adj_mat.sum(axis=1))
-            d_inv = np.power(rowsum, -0.5).flatten()
-            d_inv[np.isinf(d_inv)] = 0.
-            d_mat = scipy.sparse.diags(d_inv)
-            norm_adj = d_mat.dot(adj_mat)
+        # if self.training:
+        adj_mat = self.adj_mat
+        rowsum = np.array(adj_mat.sum(axis=1))
+        d_inv = np.power(rowsum, -0.5).flatten()
+        d_inv[np.isinf(d_inv)] = 0.
+        d_mat = scipy.sparse.diags(d_inv)
+        norm_adj = d_mat.dot(adj_mat)
 
-            colsum = np.array(adj_mat.sum(axis=0))
-            d_inv = np.power(colsum, -0.5).flatten()
-            d_inv[np.isinf(d_inv)] = 0.
-            d_mat = scipy.sparse.diags(d_inv)
-            self.d_mat_i = d_mat
-            self.d_mat_i_inv = scipy.sparse.diags(1 / d_inv)
-            norm_adj = norm_adj.dot(d_mat)
-            self.norm_adj = norm_adj.tocsc()
-        else:
-            if not isinstance(self.adj_mat, (torch.Tensor, torch.sparse.Tensor)):
-                raise ValueError("The perturbation process requires the adjacency matrix to be a pytorch tensor")
-
-            adj_mat = self.adj_mat
-            rowsum = adj_mat.sum(dim=1)
-            d_inv = torch.pow(rowsum, -0.5)
-            d_inv[torch.isinf(d_inv)] = 0.
-            d_mat = torch.sparse_coo_tensor(
-                torch.tile(torch.arange(d_inv.shape[0]), (2, 1)),
-                d_inv,
-                (d_inv.shape[0], d_inv.shape[0]),
-                device=d_inv.device
-            )
-            norm_adj = torch.sparse.mm(d_mat, self.adj_mat)
-
-            colsum = adj_mat.sum(dim=0)
-            d_inv = torch.pow(colsum, -0.5)
-            d_inv[torch.isinf(d_inv)] = 0.
-            d_mat = torch.sparse_coo_tensor(
-                torch.tile(torch.arange(d_inv.shape[0]), (2, 1)),
-                d_inv,
-                (d_inv.shape[0], d_inv.shape[0]),
-                device=d_inv.device
-            )
-            self.d_mat_i = d_mat
-            self.d_mat_i_inv = torch.sparse_coo_tensor(
-                torch.tile(torch.arange(d_inv.shape[0]), (2, 1)),
-                1 / d_inv,
-                (d_inv.shape[0], d_inv.shape[0]),
-                device=d_inv.device
-            )
-            self.norm_adj = torch.sparse.mm(norm_adj, d_mat)
+        colsum = np.array(adj_mat.sum(axis=0))
+        d_inv = np.power(colsum, -0.5).flatten()
+        d_inv[np.isinf(d_inv)] = 0.
+        d_mat = scipy.sparse.diags(d_inv)
+        self.d_mat_i = d_mat
+        self.d_mat_i_inv = scipy.sparse.diags(1 / d_inv)
+        norm_adj = norm_adj.dot(d_mat)
+        self.norm_adj = norm_adj.tocsc()
+        # else:
+        #     if not isinstance(self.adj_mat, (torch.Tensor, torch.sparse.Tensor)):
+        #         raise ValueError("The perturbation process requires the adjacency matrix to be a pytorch tensor")
+        #
+        #     adj_mat = self.adj_mat
+        #     rowsum = adj_mat.sum(dim=1)
+        #     d_inv = torch.pow(rowsum, -0.5)
+        #     d_inv[torch.isinf(d_inv)] = 0.
+        #     d_mat = torch.sparse_coo_tensor(
+        #         torch.tile(torch.arange(d_inv.shape[0]), (2, 1)),
+        #         d_inv,
+        #         (d_inv.shape[0], d_inv.shape[0]),
+        #         device=d_inv.device
+        #     )
+        #     norm_adj = torch.sparse.mm(d_mat, self.adj_mat)
+        #
+        #     colsum = adj_mat.sum(dim=0)
+        #     d_inv = torch.pow(colsum, -0.5)
+        #     d_inv[torch.isinf(d_inv)] = 0.
+        #     d_mat = torch.sparse_coo_tensor(
+        #         torch.tile(torch.arange(d_inv.shape[0]), (2, 1)),
+        #         d_inv,
+        #         (d_inv.shape[0], d_inv.shape[0]),
+        #         device=d_inv.device
+        #     )
+        #     self.d_mat_i = d_mat
+        #     self.d_mat_i_inv = torch.sparse_coo_tensor(
+        #         torch.tile(torch.arange(d_inv.shape[0]), (2, 1)),
+        #         1 / d_inv,
+        #         (d_inv.shape[0], d_inv.shape[0]),
+        #         device=d_inv.device
+        #     )
+        #     self.norm_adj = torch.sparse.mm(norm_adj, d_mat)
 
     def _generate_user_rating(self):
         U_2 = self.adj_mat @ self.norm_adj.T @ self.norm_adj

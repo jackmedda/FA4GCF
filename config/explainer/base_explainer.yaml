@@ -1,3 +1,5 @@
+unused_col: {}  # ensures all columns are taken (useful for the timestamp information during the perturbation)
+
 # optimizer for explainer ['SGD', 'AdamW', 'Adadelta']
 cf_optimizer: SGD
 # learning rate of optimizer for explainer
@@ -72,7 +74,7 @@ early_stopping:
     ignore: 0
     method: 'consistency'
     mode: 'lt'  # lower than, use any other python func ('le', 'gt', 'ge')
-    delta: 0.001  # several experiments show many low peaks with differences about > 0.15, which are relevant for us
+    delta: 0.0005  # several experiments show many low peaks with differences about > 0.15, which are relevant for us
     check_value: 'exp_metric'  # ['exp_loss', 'exp_metric']
 
 previous_loss_value: False

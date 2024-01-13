@@ -50,7 +50,9 @@ class PerturbationSampler:
         if self.users_zero_th is not None:
             eval_metric = self.perturbation_trainer.eval_metric
 
-            zero_th_users = pref_data.loc[(pref_data[eval_metric] <= self.users_zero_th), 'user_id']
+            zero_th_users = torch.from_numpy(
+                pref_data.loc[(pref_data[eval_metric] <= self.users_zero_th), 'user_id'].to_numpy()
+            )
 
             users_with_zero_th_list, counts = torch.cat((users_list, zero_th_users)).unique(return_counts=True)
             users_list = users_with_zero_th_list[counts > 1]
@@ -81,7 +83,7 @@ class PerturbationSampler:
             mean_dist = np.array(igg.distances(source=users_list, target=disadvantaged_users)).mean(axis=1)
             furthest_users = np.argsort(mean_dist)
 
-            import pdb; pdb.set_trace()  # se rimuovo gli user e item padding coincidono comunque gli indici?
+            import pdb; pdb.set_trace()  # se rimuovo in igg gli user e item padding coincidono comunque gli indici?
             n_furthest = int(self.users_furthest_ratio * furthest_users.shape[0])
             users_list = users_list[furthest_users[-n_furthest:]]
 

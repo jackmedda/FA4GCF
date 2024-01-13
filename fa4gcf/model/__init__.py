@@ -1,1 +1,1 @@
-from fa4gcf.model.perturbed_model import PygPerturbedModel
+from fa4gcf.model.perturbed_recommender.perturbed_model import PygPerturbedModel
