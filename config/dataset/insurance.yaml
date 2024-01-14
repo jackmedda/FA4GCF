@@ -1,6 +1,6 @@
 USER_ID_FIELD: 'client_id'
 ITEM_ID_FIELD: 'product_id'
-TIMESTAMP_FIELD: 'timestamp'
+# TIME_FIELD: 'timestamp'
 train_batch_size: 256
 eval_batch_size: 512
 load_col: {'inter': ['client_id', 'product_id']}

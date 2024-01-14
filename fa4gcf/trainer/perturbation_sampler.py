@@ -1,5 +1,7 @@
+import igraph
 import torch
 import numpy as np
+import pandas as pd
 
 import gnnuers.evaluation as eval_utils
 
@@ -16,6 +18,9 @@ class PerturbationSampler:
                  users_low_degree_ratio=0.,
                  items_preference_ratio=0.,
                  items_niche_ratio=0.,
+                 users_interaction_recency_ratio=0.,
+                 items_timeless_ratio=0.,
+                 items_pagerank_ratio=0.,
                  random_sampling_size=None):  # (user_size: float, item_size: float)
 
         self.dataset = dataset
@@ -27,10 +32,13 @@ class PerturbationSampler:
         self.users_low_degree_ratio = users_low_degree_ratio
         self.users_furthest_ratio = users_furthest_ratio
         self.users_sparse_ratio = users_sparse_ratio
+        self.users_interaction_recency_ratio = users_interaction_recency_ratio
 
         # Item-sampling Policies
         self.items_preference_ratio = items_preference_ratio
         self.items_niche_ratio = items_niche_ratio
+        self.items_timeless_ratio = items_timeless_ratio
+        self.items_pagerank_ratio = items_pagerank_ratio
 
         # Other sampling Policies
         self.random_sampling_size = random_sampling_size  # it can be chained with other policies
@@ -79,11 +87,12 @@ class PerturbationSampler:
             disadvantaged_mask = user_feat[sensitive_attribute][full_users_list] == disadv_group
             disadvantaged_users = full_users_list[disadvantaged_mask].numpy()
 
+            # due to the removal of user/item padding in the igraph graph,
+            # the ids are first shifted back by 1 and then forward by 1 for the argsort on the distances
             igg = eval_utils.get_bipartite_igraph(self.dataset, remove_first_row_col=True)
-            mean_dist = np.array(igg.distances(source=users_list, target=disadvantaged_users)).mean(axis=1)
-            furthest_users = np.argsort(mean_dist)
+            mean_dist = np.array(igg.distances(source=users_list - 1, target=disadvantaged_users - 1)).mean(axis=1)
+            furthest_users = np.argsort(mean_dist) + 1
 
-            import pdb; pdb.set_trace()  # se rimuovo in igg gli user e item padding coincidono comunque gli indici?
             n_furthest = int(self.users_furthest_ratio * furthest_users.shape[0])
             users_list = users_list[furthest_users[-n_furthest:]]
 
@@ -102,6 +111,23 @@ class PerturbationSampler:
             n_most_sparse_users = int(self.users_sparse_ratio * sparsity.shape[0])
             most_sparse = torch.argsort(users_sparsity)[-n_most_sparse_users:]
             users_list = users_list[most_sparse]
+
+        return users_list
+
+    def _apply_users_interaction_recency_policy(self, users_list):
+        if self.users_interaction_recency_ratio > 0:
+            uid_field, time_field = self.dataset.uid_field, self.dataset.time_field
+
+            users_list_feat_mask = torch.isin(self.dataset.inter_feat[uid_field], users_list)
+            users_list_feat = self.dataset.inter_feat[users_list_feat_mask]  # makes a copy
+
+            df = pd.DataFrame(users_list_feat.numpy())
+            latest_inter_df = df.groupby(uid_field).max().reset_index().sort_values(time_field, ascending=False)
+            users_interaction_recency = torch.from_numpy(latest_inter_df[uid_field].to_numpy())
+
+            n_most_recent_users = int(self.users_interaction_recency_ratio * users_list.shape[0])
+            most_recent = users_interaction_recency[:n_most_recent_users]
+            users_list = most_recent
 
         return users_list
 
@@ -140,6 +166,41 @@ class PerturbationSampler:
 
         return items_list
 
+    def _apply_items_timeless_policy(self, items_list):
+        if self.items_timeless_ratio > 0:
+            iid_field, time_field = self.dataset.iid_field, self.dataset.time_field
+
+            items_list_feat_mask = torch.isin(self.dataset.inter_feat[iid_field], items_list)
+            items_list_feat = self.dataset.inter_feat[items_list_feat_mask]  # makes a copy
+
+            df = pd.DataFrame(items_list_feat.numpy())
+            df_by_item = df.groupby(iid_field)
+            latest_inter_df = df_by_item[time_field].max()
+            oldest_inter_df = df_by_item[time_field].min()
+
+            items_timeless = (latest_inter_df - oldest_inter_df).sort_values(ascending=False).index
+            items_timeless = torch.from_numpy(items_timeless.to_numpy())
+
+            n_most_timeless_items = int(self.items_timeless_ratio * items_timeless.shape[0])
+            most_timeless = items_timeless[:n_most_timeless_items]
+            items_list = most_timeless
+
+        return items_list
+
+    def _apply_items_pagerank_policy(self, items_list):
+        if self.items_pagerank_ratio > 0:
+            igg: igraph.Graph = eval_utils.get_bipartite_igraph(self.dataset, remove_first_row_col=True)
+
+            # due to the removal of user/item padding in the igraph graph,
+            # the ids are first shifted back by 1 and then forward by 1 for the argsort on the distances
+            items_pagerank = torch.Tensor(igg.pagerank(items_list - 1, directed=False))
+            highest_pagerank = torch.argsort(items_pagerank) + 1
+
+            n_highest_pagerank = int(self.items_pagerank_ratio * items_pagerank.shape[0])
+            items_list = items_list[highest_pagerank[-n_highest_pagerank:]]
+
+        return items_list
+
     def _apply_random_policy(self, users_list, items_list):
         if self.random_sampling_size is not None:
             user_size, item_size = self.random_sampling_size
@@ -162,9 +223,12 @@ class PerturbationSampler:
         sampled_users = self._apply_users_low_degree_policy(sampled_users)
         sampled_users = self._apply_users_furthest_policy(sampled_users, batched_data)
         sampled_users = self._apply_users_sparse_policy(sampled_users)
+        sampled_users = self._apply_users_interaction_recency_policy(sampled_users)
 
         sampled_items = self._apply_items_preference_policy(sampled_items)
         sampled_items = self._apply_items_niche_policy(sampled_items)
+        sampled_items = self._apply_items_timeless_policy(sampled_items)
+        sampled_items = self._apply_items_pagerank_policy(sampled_items)
 
         sampled_users, sampled_items = self._apply_random_policy(sampled_users, sampled_items)
 

@@ -1,6 +1,6 @@
 # USER_ID_FIELD: 'user_id'
 ITEM_ID_FIELD: 'artist_name'
-# TIMESTAMP_FIELD: 'timestamp'
+# TIME_FIELD: 'timestamp'
 train_batch_size: 4096
 eval_batch_size: 2048
 load_col: {'inter': ['user_id', 'artist_name']}

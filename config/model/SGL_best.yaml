@@ -1,3 +1,11 @@
+foursquare_nyc:
+  learning_rate: 2e-4
+  ssl_tau: 0.1
+  ssl_weight: 0.01
+foursquare_tky:
+  learning_rate: 2e-4
+  ssl_tau: 0.1
+  ssl_weight: 0.01
 insurance:
   learning_rate: 1e-4
   ssl_tau: 0.1

@@ -1,3 +1,11 @@
+foursquare_nyc:
+  alpha: 0.8
+  learning_rate: 2e-4
+  ssl_reg_weight: 0.05
+foursquare_tky:
+  alpha: 0.8
+  learning_rate: 2e-4
+  ssl_reg_weight: 0.05
 insurance:
   alpha: 0.8
   learning_rate: 2e-4

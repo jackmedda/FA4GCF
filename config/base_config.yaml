@@ -3,7 +3,7 @@ worker: 0
 epochs: 100
 # 'USER_ID_FIELD': 'user_id'
 # 'ITEM_ID_FIELD': 'item_id'
-TIMESTAMP_FIELD: 'timestamp'
+TIME_FIELD: 'timestamp'
 train_batch_size: 4096
 eval_batch_size: 2048
 train_neg_sample_args:          # (dict) Negative sampling configuration for model training.

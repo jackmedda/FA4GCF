@@ -1,3 +1,19 @@
+foursquare_nyc:
+  ILoss_lambda: 1e-7
+  learning_rate: 2e-4
+  negative_weight: 10
+  w1: 1.0
+  w2: 1e-7
+  w3: 1.0
+  w4: 1e-7
+foursquare_tky:
+  ILoss_lambda: 1e-7
+  learning_rate: 2e-4
+  negative_weight: 10
+  w1: 1.0
+  w2: 1e-7
+  w3: 1.0
+  w4: 1e-7
 insurance:
   ILoss_lambda: 1.0
   learning_rate: 2e-4

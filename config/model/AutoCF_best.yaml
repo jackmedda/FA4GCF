@@ -1,3 +1,11 @@
+foursquare_nyc:
+  head: 4
+  learning_rate: 2e-4
+  ssl_reg_weight: 1
+foursquare_tky:
+  head: 4
+  learning_rate: 2e-4
+  ssl_reg_weight: 1
 insurance:
   head: 2
   learning_rate: 2e-4

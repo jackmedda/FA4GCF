@@ -1,3 +1,9 @@
+foursquare_nyc:
+  gamma: 0.5
+  learning_rate: 2e-4
+foursquare_tky:
+  gamma: 0.5
+  learning_rate: 2e-4
 insurance:
   gamma: 0.5
   learning_rate: 1e-4

@@ -21,3 +21,7 @@ users_furthest_constraint_ratio: 0.35  # it represent the ratio of the furthest 
 sparse_users_constraint_ratio: 0.35  # it represent the ratio of the users most connected with niche items
 items_preference_constraint_ratio: 0.2  # it represent the ratio of items mostly preferred by the perturbed group
 niche_items_constraint_ratio: 0.2  # it represents the ratio of the most niche items
+
+interaction_recency_constraint_ratio: 0.35  # it represents the ratio of the users with the most recent interactions
+items_timeless_constraint_ratio: 0.2  # it represents the ratio of the most timeless items
+items_pagerank_constraint_ratio: 0.2  # it represents the ratio of the items with the highest pagerank

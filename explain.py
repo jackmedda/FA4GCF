@@ -109,6 +109,9 @@ def perturb(config, model, _rec_data, _full_dataset, _train_data, _valid_data, _
     users_order_file = os.path.join(base_exps_file, f"users_order.pkl")
     model_preds_file = os.path.join(base_exps_file, f"model_rec_test_preds.pkl")
     checkpoint_path = os.path.join(base_exps_file, "checkpoint.pth")
+    fh = logging.FileHandler(os.path.join(base_exps_file, "perturbation_trainer.log"))
+    fh.setLevel(logging.DEBUG)
+    logging.getLogger().addHandler(fh)
 
     if overwrite and os.path.exists(checkpoint_path):
         os.remove(checkpoint_path)

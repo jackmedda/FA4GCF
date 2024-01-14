@@ -1,3 +1,7 @@
+foursquare_nyc:
+  learning_rate: 2e-4
+foursquare_tky:
+  learning_rate: 2e-4
 insurance:
   learning_rate: 2e-4
 lastfm-1k:

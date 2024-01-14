@@ -1,8 +1,8 @@
 # learning rate of optimizer for explainer
-cf_learning_rate: 55000 # 3000 (deletion) / 65000 (addition) for NDCGApprox, 300 (deletion) for SigmoidBCELoss
+cf_learning_rate: 300000 # 3000 (deletion) / 65000 (addition) for NDCGApprox, 300 (deletion) for SigmoidBCELoss
 
 # how many users should be considered to explain?
-user_batch_exp: 48
+user_batch_exp: 192
 # loss weight for the graph dist loss
 cf_beta: 0.5  # 0.01 for NDCGApproxLoss, 4.0 for SigmoidBCELoss
 
@@ -10,10 +10,10 @@ cf_beta: 0.5  # 0.01 for NDCGApproxLoss, 4.0 for SigmoidBCELoss
 sensitive_attribute: gender
 
 load_col:
-    inter: [client_id, product_id]
-    user: [client_id, gender, age, marital_status]
+    inter: [user_id, venue_category, timestamp]
+    user: [user_id, gender]
 
-random_perturbation_p: 0.076
+random_perturbation_p: 0.000143
 users_zero_constraint_value: 0
 users_low_degree_ratio: 0.35  # it represent the ratio of the users with the lowest degree
 users_furthest_constraint_ratio: 0.35  # it represent the ratio of the furthest users from the non perturbed group

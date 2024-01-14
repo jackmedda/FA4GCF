@@ -15,6 +15,13 @@ class PerturbationTrainer(DPBG):
             config, dataset, rec_data, model, dist=dist, **kwargs
         )
 
+        self.interaction_recency_constraint = config['explainer_policies']['interaction_recency_constraint']
+        self.interaction_recency_constraint_ratio = config['interaction_recency_constraint_ratio'] or 0.35
+        self.items_timeless_constraint = config['explainer_policies']['items_timeless_constraint']
+        self.items_timeless_constraint_ratio = config['items_timeless_constraint_ratio'] or 0.2
+        self.items_pagerank_constraint = config['explainer_policies']['items_pagerank_constraint']
+        self.items_pagerank_constraint_ratio = config['items_pagerank_constraint_ratio'] or 0.2
+
         self.random_sampling_policy_data = config['random_sampling_policy_data']
         self.pert_sampler = PerturbationSampler(
             self.dataset,
@@ -26,6 +33,9 @@ class PerturbationTrainer(DPBG):
             users_low_degree_ratio=self.users_low_degree_ratio if self.users_low_degree else 0,
             items_preference_ratio=self.items_preference_constraint_ratio if self.items_preference_constraint else 0,
             items_niche_ratio=self.niche_items_constraint_ratio if self.niche_items_constraint else 0,
+            users_interaction_recency_ratio=self.interaction_recency_constraint_ratio if self.interaction_recency_constraint else 0,
+            items_timeless_ratio=self.items_timeless_constraint_ratio if self.items_timeless_constraint else 0,
+            items_pagerank_ratio=self.items_pagerank_constraint_ratio if self.items_pagerank_constraint else 0,
             random_sampling_size=self.random_sampling_policy_data
         )
 

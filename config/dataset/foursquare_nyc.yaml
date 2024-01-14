@@ -1,0 +1,10 @@
+# 'USER_ID_FIELD': user_id,
+ITEM_ID_FIELD: venue_category
+TIME_FIELD: timestamp
+train_batch_size: 4096
+eval_batch_size: 500000
+load_col: {'inter': ['user_id', 'venue_category', 'timestamp']}
+unused_col: {'inter': ['timestamp']}
+
+# NCL
+num_clusters: 10

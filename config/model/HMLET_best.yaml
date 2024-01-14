@@ -1,3 +1,11 @@
+foursquare_nyc:
+  activation_function: elu
+  learning_rate: 2e-4
+  ori_temp: 0.7
+foursquare_tky:
+  activation_function: elu
+  learning_rate: 2e-4
+  ori_temp: 0.7
 insurance:
   activation_function: elu
   learning_rate: 2e-4
