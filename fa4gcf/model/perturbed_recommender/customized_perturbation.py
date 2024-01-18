@@ -61,7 +61,7 @@ class PerturbationApplier:
                 device=model.device
             )
         model.rate_matrix = rate_matrix
-        U, value, V = model.get_svd(q)
+        U, value, V = model.get_svd(model.q)
 
         weighted_value = self._apply_value_weight(value)
 

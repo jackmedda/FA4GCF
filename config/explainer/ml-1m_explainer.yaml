@@ -2,7 +2,7 @@
 cf_learning_rate: 300000 # 3000 (deletion) / 65000 (addition) for NDCGApprox, 300 (deletion) for SigmoidBCELoss
 
 # how many users should be considered to explain?
-user_batch_exp: 192
+user_batch_exp: 128
 # loss weight for the graph dist loss
 cf_beta: 0.5  # 0.01 for NDCGApproxLoss, 4.0 for SigmoidBCELoss
 
@@ -11,7 +11,6 @@ sensitive_attribute: gender
 
 load_col:
     inter: [user_id, item_id, timestamp]
-    item: [item_id, class]
     user: [user_id, gender, age]
 
 random_perturbation_p: 0.000143

@@ -12,7 +12,6 @@ sensitive_attribute: age
 load_col:
     inter: [customer_id, product_id]
     user: [customer_id, age, residence_area_code]
-    item: [product_id, product_subclass]
 
 random_perturbation_p: 0.0002
 users_zero_constraint_value: 0

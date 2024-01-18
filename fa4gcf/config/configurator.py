@@ -1,6 +1,7 @@
 import os
 import re
 import yaml
+import pickle
 
 from recbole.utils import ModelType
 from recbole.config import Config as Recbole_Config

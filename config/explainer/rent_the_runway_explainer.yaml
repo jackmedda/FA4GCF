@@ -1,3 +1,5 @@
+TIME_FIELD: 'review_date'
+
 # learning rate of optimizer for explainer
 cf_learning_rate: 40000 # 3000 (deletion) / 65000 (addition) for NDCGApprox, 300 (deletion) for SigmoidBCELoss
 
@@ -10,7 +12,7 @@ cf_beta: 0.5  # 0.01 for NDCGApproxLoss, 4.0 for SigmoidBCELoss
 sensitive_attribute: age
 
 load_col:
-    inter: [user_id, item_id]
+    inter: [user_id, item_id, review_date]
     user: [user_id, age]
 
 random_perturbation_p: 0.076

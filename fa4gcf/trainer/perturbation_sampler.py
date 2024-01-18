@@ -91,7 +91,7 @@ class PerturbationSampler:
             # the ids are first shifted back by 1 and then forward by 1 for the argsort on the distances
             igg = eval_utils.get_bipartite_igraph(self.dataset, remove_first_row_col=True)
             mean_dist = np.array(igg.distances(source=users_list - 1, target=disadvantaged_users - 1)).mean(axis=1)
-            furthest_users = np.argsort(mean_dist) + 1
+            furthest_users = np.argsort(mean_dist)
 
             n_furthest = int(self.users_furthest_ratio * furthest_users.shape[0])
             users_list = users_list[furthest_users[-n_furthest:]]
@@ -151,7 +151,7 @@ class PerturbationSampler:
             n_advantaged_most_preferred_items = int(self.items_preference_ratio * advantaged_preference_ratio.shape[0])
             most_preferred = torch.argsort(advantaged_preference_ratio)[-n_advantaged_most_preferred_items:]
 
-            items_with_most_preferred_list = torch.cat((items_list, most_preferred)).unique(return_counts=True)
+            items_with_most_preferred_list, counts = torch.cat((items_list, most_preferred)).unique(return_counts=True)
             items_list = items_with_most_preferred_list[counts > 1]
 
         return items_list
@@ -194,7 +194,7 @@ class PerturbationSampler:
             # due to the removal of user/item padding in the igraph graph,
             # the ids are first shifted back by 1 and then forward by 1 for the argsort on the distances
             items_pagerank = torch.Tensor(igg.pagerank(items_list - 1, directed=False))
-            highest_pagerank = torch.argsort(items_pagerank) + 1
+            highest_pagerank = torch.argsort(items_pagerank)
 
             n_highest_pagerank = int(self.items_pagerank_ratio * items_pagerank.shape[0])
             items_list = items_list[highest_pagerank[-n_highest_pagerank:]]
@@ -232,4 +232,4 @@ class PerturbationSampler:
 
         sampled_users, sampled_items = self._apply_random_policy(sampled_users, sampled_items)
 
-        return sampled_users, sampled_users
+        return sampled_users, sampled_items

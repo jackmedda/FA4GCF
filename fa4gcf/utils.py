@@ -7,6 +7,7 @@ from logging import getLogger
 from typing import Literal
 
 import torch
+import numpy as np
 from recbole.sampler import KGSampler
 from recbole.data.dataloader import *
 from recbole.utils import (
@@ -22,8 +23,48 @@ from recbole.data.utils import (
     get_dataloader as get_recbole_dataloader
 )
 
+from gnnuers.data import Interaction
+
 from fa4gcf.data import Dataset
 from fa4gcf.data.custom_dataloader import SVD_GCNDataLoader
+
+
+def get_dataset_with_perturbed_edges(pert_edges: np.ndarray, dataset):
+    user_num = dataset.user_num
+    uid_field, iid_field = dataset.uid_field, dataset.iid_field
+    pert_edges = pert_edges.copy()
+
+    pert_edges = torch.tensor(pert_edges)
+    pert_edges[1] -= user_num  # remap items in range [0, item_num)
+
+    orig_inter_feat = dataset.inter_feat
+    pert_inter_feat = {}
+    for i, col in enumerate([uid_field, iid_field]):
+        pert_inter_feat[col] = torch.cat((orig_inter_feat[col], pert_edges[i]))
+
+    unique, counts = torch.stack(
+        (pert_inter_feat[uid_field], pert_inter_feat[iid_field]),
+    ).unique(dim=1, return_counts=True)
+    pert_inter_feat[uid_field], pert_inter_feat[iid_field] = unique[:, counts == 1]
+
+    return dataset.copy(Interaction(pert_inter_feat))
+
+
+def get_dataloader_with_perturbed_edges(pert_edges: np.ndarray, config, dataset, train_data, valid_data, test_data):
+    pert_edges = pert_edges.copy()
+
+    train_dataset = get_dataset_with_perturbed_edges(pert_edges, train_data.dataset)
+    valid_dataset = get_dataset_with_perturbed_edges(pert_edges, valid_data.dataset)
+    test_dataset = get_dataset_with_perturbed_edges(pert_edges, test_data.dataset)
+
+    built_datasets = [train_dataset, valid_dataset, test_dataset]
+    train_sampler, valid_sampler, test_sampler = create_samplers(config, dataset, built_datasets)
+
+    train_data = get_dataloader(config, 'train')(config, train_dataset, train_sampler, shuffle=False)
+    valid_data = get_dataloader(config, 'evaluation')(config, valid_dataset, valid_sampler, shuffle=False)
+    test_data = get_dataloader(config, 'evaluation')(config, test_dataset, test_sampler, shuffle=False)
+
+    return train_data, valid_data, test_data
 
 
 def load_data_and_model(model_file, explainer_config=None, cmd_config_args=None, perturbed_dataset=None):

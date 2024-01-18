@@ -61,7 +61,7 @@ class SVD_GCN(GeneralGraphRecommender):
         self.NEIGHBOR_ITEM_ID = config["NEIGHBOR_ITEM_ID"]
         self.NEG_NEIGHBOR_ITEM_ID = config["NEG_NEIGHBOR_ITEM_ID"]
 
-        q = self._update_q(config)
+        self.q = self._update_q(config)
 
         # generate approximated SVD
         self.rate_matrix = self.get_rate_matrix(dataset)

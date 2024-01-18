@@ -39,12 +39,17 @@ class PygPerturbedModel(RecboleModel):
         if isinstance(self.inner_pyg_model, LightGCL):
             raise NotImplementedError("Current implementation of LightGCL cannot be perturbed.")
 
-        if self.inner_pyg_model.edge_weight is None:
-            self.adj = self.inner_pyg_model.edge_index.fill_value(1.).to(self.inner_pyg_model.device)
+        if hasattr(self.inner_pyg_model, "edge_weight") and hasattr(self.inner_pyg_model, "edge_index"):
+            edge_index, edge_weight = self.inner_pyg_model.edge_index, self.inner_pyg_model.edge_weight
+        else:  # necessary for SVD_GCN that deletes edge_index and edge_weight to reduce memory usage
+            edge_index, edge_weight = dataset.get_norm_adj_mat(enable_sparse=config["enable_sparse"])
+
+        if edge_weight is None:
+            self.adj = edge_index.fill_value(1.).to(self.inner_pyg_model.device)
         else:
             self.adj = torch.sparse_coo_tensor(
-                self.inner_pyg_model.edge_index.clone(),
-                torch.ones_like(self.inner_pyg_model.edge_weight),
+                edge_index.clone(),
+                torch.ones_like(edge_weight),
                 (self.num_all, self.num_all),
                 device=self.inner_pyg_model.device
             )
@@ -52,12 +57,14 @@ class PygPerturbedModel(RecboleModel):
         gcn_norm_kwargs = {}
         if isinstance(self.inner_pyg_model, SVD_GCN):
             gcn_norm_kwargs['alpha'] = self.inner_pyg_model.alpha
+            if not hasattr(self.inner_pyg_model, "q"):
+                self.inner_pyg_model.q = self.inner_pyg_model._update_q(config)
 
         self.graph_perturbation_layer = GraphPerturbation(
             config,
             dataset,
-            self.inner_pyg_model.edge_index,
-            self.inner_pyg_model.edge_weight,
+            edge_index,
+            edge_weight,
             filtered_users=filtered_users,
             filtered_items=filtered_items,
             random_perturbation=random_perturbation,
@@ -102,13 +109,13 @@ class PygPerturbedModel(RecboleModel):
         fair_loss = fair_loss_f(cf_scores, fair_loss_target)
 
         ########### Dist Loss ###########
-        if self.inner_pyg_model.edge_weight is None:
+        if isinstance(cf_adj, SparseTensor):
             orig_dist = cf_adj.add(self.adj.mul_nnz(torch.tensor(-1), layout='coo'))  # cf_adj - self.adj
         else:
             orig_dist = (cf_adj - self.adj)
         if not orig_dist.is_coalesced():
             orig_dist = orig_dist.coalesce()
-        if self.inner_pyg_model.edge_weight is None:
+        if isinstance(cf_adj, SparseTensor):
             _, _, vals = orig_dist.coo()
         else:
             vals = orig_dist.values()
