@@ -99,6 +99,12 @@ class PerturbationTrainer(DPBG):
         """
         train_start = time.time()
 
+        # Only the 500 itmes with the highest predicted relevance will be used to measure the approx NDCG
+        # This prevents the usage of a tremendous amount of memory, due to the pairwise preference function
+        MEMORY_PERFORMANCE_MAX_LOSS_TOPK_ITEMS = 500
+        if self._exp_loss.ranking_loss_function.__MAX_TOPK_ITEMS__ != MEMORY_PERFORMANCE_MAX_LOSS_TOPK_ITEMS:
+            self._exp_loss.ranking_loss_function.__MAX_TOPK_ITEMS__ = MEMORY_PERFORMANCE_MAX_LOSS_TOPK_ITEMS
+
         if self.mini_batch_descent:
             self.cf_optimizer.zero_grad()
         self.cf_model.train()
