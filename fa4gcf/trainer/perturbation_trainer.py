@@ -53,7 +53,6 @@ class PerturbationTrainer(DPBG):
         self.determine_adv_group(batched_data.detach().numpy(), rec_model_topk)
         pref_data = self._pref_data_sens_and_metric(batched_data.detach().numpy(), rec_model_topk)
         filtered_users, filtered_items = self.pert_sampler.apply_policies(batched_data, pref_data)
-        import pdb; pdb.set_trace()
 
         return batched_data, filtered_users, filtered_items, (test_model_topk, test_scores_args, rec_model_topk, rec_scores_args)
 
