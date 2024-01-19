@@ -52,18 +52,23 @@ class PerturbationApplier:
     @staticmethod
     def _apply_svd_gcn(model, edge_index, edge_weight):
         if isinstance(edge_index, SparseTensor):
-            rate_matrix = edge_index
-        else:
-            rate_matrix = torch.sparse_coo_tensor(
-                edge_index,
-                edge_weight,
-                size=(model.n_users, model.n_items),
-                device=model.device
-            )
+            row, col, edge_weight = edge_index.coo()
+            edge_index = torch.stack((row, col))
+
+        edge_index = edge_index[:, :(edge_index.shape[1] // 2)]
+        edge_weight = edge_weight[:(edge_weight.shape[0] // 2)]
+        edge_index[1] -= model.n_users  # remap item_ids in the right range
+
+        rate_matrix = torch.sparse_coo_tensor(
+            edge_index,
+            edge_weight,
+            size=(model.n_users, model.n_items),
+            device=model.device
+        )
         model.rate_matrix = rate_matrix
         U, value, V = model.get_svd(model.q)
 
-        weighted_value = self._apply_value_weight(value)
+        weighted_value = model._apply_value_weight(value)
 
         model.user_vector = U * weighted_value
         model.item_vector = V * weighted_value
