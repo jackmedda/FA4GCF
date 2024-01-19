@@ -132,7 +132,11 @@ class PerturbationSampler:
         return users_list
 
     def _apply_items_preference_policy(self, items_list):
-        """ advantage_ratio > 1 means the advantaged group prefers those items w.r.t. to their representation """
+        """
+        advantaged_preference_ratio > 1 means the advantaged group prefers those items w.r.t. to their representation.
+        self.perturbation_trainer.adv_group always stores the group to be perturbed. So, if the config param
+        `perturb_adv_group` is False, then adv_group will actually be the disadvantaged group
+        """
         if self.items_preference_ratio > 0:
             item_history, _, item_history_len = self.dataset.history_user_matrix()
             adv_group = self.perturbation_trainer.adv_group

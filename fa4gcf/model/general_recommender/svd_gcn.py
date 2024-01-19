@@ -65,7 +65,7 @@ class SVD_GCN(GeneralGraphRecommender):
 
         # generate approximated SVD
         self.rate_matrix = self.get_rate_matrix(dataset)
-        U, value, V = self.get_svd(q)
+        U, value, V = self.get_svd(self.q)
 
         weighted_value = self._apply_value_weight(value)
 
