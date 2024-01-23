@@ -1,6 +1,7 @@
 import time
 
 import torch
+import torch.cuda.amp as amp
 from torch_geometric.typing import SparseTensor
 from gnnuers.explainers import DPBG
 
@@ -14,6 +15,8 @@ class PerturbationTrainer(DPBG):
         super(PerturbationTrainer, self).__init__(
             config, dataset, rec_data, model, dist=dist, **kwargs
         )
+
+        self.enable_amp = config["enable_amp"]
 
         self.interaction_recency_constraint = config['explainer_policies']['interaction_recency_constraint']
         self.interaction_recency_constraint_ratio = config['interaction_recency_constraint_ratio'] or 0.35
@@ -98,6 +101,7 @@ class PerturbationTrainer(DPBG):
         :return:
         """
         train_start = time.time()
+        torch.cuda.empty_cache()
 
         # Only the 500 itmes with the highest predicted relevance will be used to measure the approx NDCG
         # This prevents the usage of a tremendous amount of memory, due to the pairwise preference function
@@ -116,11 +120,12 @@ class PerturbationTrainer(DPBG):
             data_feat = self.get_loss_data_feat(users_ids, user_feat)
             self._exp_loss.update_data_feat(data_feat)
 
-        loss_total, orig_loss_graph_dist, loss_graph_dist, exp_loss, adj_sub_cf_adj = self.cf_model.loss(
-            scores_args,
-            self._exp_loss,
-            target
-        )
+        with amp.autocast(enabled=self.enable_amp):
+            loss_total, orig_loss_graph_dist, loss_graph_dist, exp_loss, adj_sub_cf_adj = self.cf_model.loss(
+                scores_args,
+                self._exp_loss,
+                target
+            )
 
         torch.cuda.empty_cache()
         # import torchviz
