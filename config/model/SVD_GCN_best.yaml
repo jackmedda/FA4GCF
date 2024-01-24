@@ -1,26 +1,26 @@
 foursquare_nyc:
   True: # parametric: True
-    alpha:
-    beta:
-    item_coefficient:
-    k_singular_values:
-    learning_rate: 2e-4
-    user_coefficient:
+    alpha: 1
+    beta: 0.01
+    item_coefficient: 0.5
+    k_singular_values: 55
+    learning_rate: 1e-4
+    user_coefficient: 0.0
   False: # parametric: True
     alpha: 1
-    beta: 0.001
+    beta: 0.01
     k_singular_values: 55
 foursquare_tky:
   True: # parametric: True
-    alpha:
-    beta:
-    item_coefficient:
-    k_singular_values:
-    learning_rate: 2e-4
-    user_coefficient:
+    alpha: 1
+    beta: 0.01
+    item_coefficient: 0.5
+    k_singular_values: 55
+    learning_rate: 1e-4
+    user_coefficient: 0.0
   False: # parametric: True
     alpha: 1
-    beta: 0.001
+    beta: 0.01
     k_singular_values: 55
 insurance:
   True:  # parametric: True
@@ -36,24 +36,24 @@ insurance:
     k_singular_values: 55  # due to division when it is larger than n_users or n_items, it should be 11 in reality
 lastfm-1k:
   True: # parametric: True
-    alpha:
-    beta:
-    item_coefficient:
-    k_singular_values:
-    learning_rate: 2e-4
-    user_coefficient:
+    alpha: 1
+    beta: 0.01
+    item_coefficient: 0.5
+    k_singular_values: 55
+    learning_rate: 1e-4
+    user_coefficient: 0.0
   False: # parametric: True
     alpha: 1
     beta: 0.01
     k_singular_values: 55
 ml-1m:
   True: # parametric: True
-    alpha:
-    beta:
-    item_coefficient:
-    k_singular_values:
-    learning_rate: 2e-4
-    user_coefficient:
+    alpha: 3
+    beta: 0.001
+    item_coefficient: 0.5
+    k_singular_values: 20
+    learning_rate: 1e-4
+    user_coefficient: 0.0
   False: # parametric: True
     alpha: 1
     beta: 0.001
