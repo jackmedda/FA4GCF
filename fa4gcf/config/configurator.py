@@ -19,7 +19,8 @@ class Config(Recbole_Config):
             config_dict=config_dict
         )
 
-        if self["MODEL_TYPE"] == ModelType.TRADITIONAL:
+        svd_gcn_exception = model == "SVD_GCN" and not self.final_config_dict.get("parametric", True)
+        if self["MODEL_TYPE"] == ModelType.TRADITIONAL or svd_gcn_exception:
             self["train_neg_sample_args"]["sample_num"] = 1
 
     def _get_model_and_dataset(self, model, dataset):

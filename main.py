@@ -274,16 +274,17 @@ if __name__ == "__main__":
     perturbed_train_group.add_argument('--explanations_path', default=None)
     recbole_hyper_group.add_argument('--params_file', default=None)
 
-    args, unk_args = parser.parse_known_args()
+    args, parsed_unk_args = parser.parse_known_args()
     print(args)
+    print("Unknown args", parsed_unk_args)
     config_dict = {}
 
     if args.run not in ['train', 'explain', 'recbole_hyper']:
         raise NotImplementedError(f"The run `{args.run}` is not supported.")
 
+    unk_args = parsed_unk_args[:]
     unk_args[::2] = map(lambda s: s.replace('-', ''), unk_args[::2])
     unk_args = dict(zip(unk_args[::2], unk_args[1::2]))
-    print("Unknown args", unk_args)
 
     if args.hyper_optimize and not args.verbose:
         from tqdm import tqdm
@@ -349,6 +350,9 @@ if __name__ == "__main__":
                         if 'parametric' in conf_arg_dict:
                             parametric = conf_arg_dict['parametric']
 
+                    cmd_line_parametric = [cmd for cmd in parsed_unk_args if '--parametric=' in cmd]
+                    if cmd_line_parametric:
+                        parametric = cmd_line_parametric[0].split('=')[1] == 'True'
                     if parametric is None:
                         raise ValueError("`parametric` was not set for SVD_GCN using best_params")
 
