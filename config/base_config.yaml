@@ -13,7 +13,7 @@ train_neg_sample_args:          # (dict) Negative sampling configuration for mod
   dynamic: False                # (bool) Whether to use dynamic negative sampling.
   candidate_num: 0
 eval_step: 10
-metrics: ['Recall', 'NDCG', 'MRR', 'Hit']
+metrics: ['Recall', 'NDCG', 'MRR', 'Hit', 'DeltaNDCG']
 topk: 10
 valid_metric: NDCG@10
 metric_decimal_place: 4

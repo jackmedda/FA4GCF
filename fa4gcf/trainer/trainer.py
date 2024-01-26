@@ -6,10 +6,38 @@ import torch
 import torch.cuda.amp as amp
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from tqdm import tqdm
-from recbole.trainer import Trainer, TraditionalTrainer
+from recbole.trainer import Trainer as RecboleTrainer
 from recbole.utils import early_stopping, dict2str, set_color, get_gpu_usage
 
+from fa4gcf.evaluation import Collector, Evaluator
 from fa4gcf.model.general_recommender.autocf import LocalGraphSampler, SubgraphRandomMasker
+
+
+class Trainer(RecboleTrainer):
+
+    def __init__(self, config, model):
+        super(Trainer, self).__init__(config, model)
+
+    @torch.no_grad()
+    def evaluate(
+            self, eval_data, load_best_model=True, model_file=None, show_progress=False
+    ):
+        # Add user sensitive attribute information to the evaluation collector
+        if eval_data:
+            self.eval_collector.eval_data_collect(eval_data)
+        return super(Trainer, self).evaluate(
+            eval_data,
+            load_best_model=load_best_model,
+            model_file=model_file,
+            show_progress=show_progress
+        )
+
+
+class TraditionalTrainer(Trainer):
+
+    def __init__(self, config, model):
+        super(TraditionalTrainer, self).__init__(config, model)
+        self.epochs = 1
 
 
 class SVD_GCNTrainer(TraditionalTrainer):

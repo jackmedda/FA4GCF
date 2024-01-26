@@ -4,12 +4,12 @@ import yaml
 import torch
 import numpy as np
 import pandas as pd
-from recbole.evaluator import Evaluator
 
 import gnnuers
 
 import fa4gcf.utils as utils
 from fa4gcf.data import Dataset
+from fa4gcf.evaluation import Evaluator
 
 
 def extract_metrics_from_perturbed_edges(exp_info: dict,

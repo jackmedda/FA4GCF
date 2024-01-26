@@ -8,13 +8,12 @@ import logging
 
 import numpy as np
 import pandas as pd
-from recbole.trainer import TraditionalTrainer
 from recbole.utils import init_logger, init_seed, set_color, get_local_time
 
 import fa4gcf.utils as utils
 from fa4gcf.config import Config
 from fa4gcf.data import Dataset, PerturbedDataset
-from fa4gcf.trainer import HyperTuning
+from fa4gcf.trainer import HyperTuning, TraditionalTrainer
 from explain import execute_explanation
 
 
@@ -79,7 +78,7 @@ def training(_config, saved=True, model_file=None, hyper=False, perturbed_datase
     best_valid_score, best_valid_result = trainer.fit(
         train_data,
         valid_data,
-        saved=saved,
+        saved=saved and not isinstance(trainer, TraditionalTrainer),
         show_progress=_config['show_progress'] and not hyper,
         verbose=not hyper
     )

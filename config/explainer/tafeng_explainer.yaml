@@ -10,7 +10,7 @@ cf_beta: 0.5  # 0.01 for NDCGApproxLoss, 4.0 for SigmoidBCELoss
 sensitive_attribute: age
 
 load_col:
-    inter: [customer_id, product_id]
+    inter: [customer_id, product_id, timestamp]
     user: [customer_id, age, residence_area_code]
 
 random_perturbation_p: 0.0002

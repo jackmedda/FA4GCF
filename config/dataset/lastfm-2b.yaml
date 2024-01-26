@@ -3,4 +3,9 @@ ITEM_ID_FIELD: 'artist_name'
 # TIME_FIELD: 'timestamp'
 train_batch_size: 4096
 eval_batch_size: 2048
-load_col: {'inter': ['user_id', 'artist_name']}
+# sensitive attributes to be used in the fairness losses and for following analysis
+sensitive_attribute: gender
+
+load_col:
+    inter: [user_id, artist_name, timestamp]
+    user: [user_id, gender, age]

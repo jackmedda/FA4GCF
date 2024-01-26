@@ -1,7 +1,12 @@
 TIME_FIELD: 'review_date'
 train_batch_size: 4096
 eval_batch_size: 500000
-load_col: {'inter': ['user_id', 'item_id', 'review_date']}
+# sensitive attributes to be used in the fairness losses and for following analysis
+sensitive_attribute: age
+
+load_col:
+    inter: [user_id, item_id, review_date]
+    user: [user_id, age]
 unused_col: {'inter': ['review_date']}
 
 # NCL

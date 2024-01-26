@@ -3,7 +3,12 @@ ITEM_ID_FIELD: 'product_id'
 TIME_FIELD: 'timestamp'
 train_batch_size: 4096
 eval_batch_size: 10000000
-load_col: {'inter': ['customer_id', 'product_id', 'timestamp']}
+# sensitive attributes to be used in the fairness losses and for following analysis
+sensitive_attribute: age
+
+load_col:
+    inter: [customer_id, product_id, timestamp]
+    user: [customer_id, age, residence_area_code]
 unused_col: {'inter': ['timestamp']}
 
 # NCL
