@@ -49,6 +49,8 @@ def extract_metrics_from_perturbed_edges(exp_info: dict,
 
             checkpoint = torch.load(model_file)
             config = checkpoint['config']
+            if mod.lower() == "svd_gcn":
+                config['user_coefficient'] = config['item_coefficient'] = 0
 
             exp_dset = dset.replace('-1000', '') if '-1000' in dset else dset
             explainer_config_file = os.path.join(

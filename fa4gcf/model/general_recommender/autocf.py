@@ -144,6 +144,7 @@ class GTLayer(torch.nn.Module):
         torch.nn.init.xavier_uniform_(self.v)
 
     def forward(self, all_embeddings, edge_index):
+        torch.cuda.empty_cache()
         if isinstance(edge_index, torch.Tensor):
             rows, cols = edge_index
         else:  # it should be a pytorch_sparse SparseTensor
@@ -152,14 +153,13 @@ class GTLayer(torch.nn.Module):
         row_embeddings = all_embeddings[rows]
         col_embeddings = all_embeddings[cols]
 
-        if torch.cuda.device_count() > 1:
-            q_embeddings = (row_embeddings @ self.q).view([-1, self.head, self.embedding_size // self.head]).to('cuda:1')
-            k_embeddings = (col_embeddings @ self.k).view([-1, self.head, self.embedding_size // self.head]).to('cuda:1')
-            v_embeddings = (col_embeddings @ self.v).view([-1, self.head, self.embedding_size // self.head]).to('cuda:1')
-        else:
-            q_embeddings = (row_embeddings @ self.q).view([-1, self.head, self.embedding_size // self.head])
-            k_embeddings = (col_embeddings @ self.k).view([-1, self.head, self.embedding_size // self.head])
-            v_embeddings = (col_embeddings @ self.v).view([-1, self.head, self.embedding_size // self.head])
+        # if torch.cuda.device_count() > 1:
+        # q_embeddings = (row_embeddings @ self.q).view([-1, self.head, self.embedding_size // self.head]).to('cuda:1')
+        # k_embeddings = (col_embeddings @ self.k).view([-1, self.head, self.embedding_size // self.head]).to('cuda:1')
+        # v_embeddings = (col_embeddings @ self.v).view([-1, self.head, self.embedding_size // self.head]).to('cuda:1')
+        q_embeddings = (row_embeddings @ self.q).view([-1, self.head, self.embedding_size // self.head])
+        k_embeddings = (col_embeddings @ self.k).view([-1, self.head, self.embedding_size // self.head])
+        v_embeddings = (col_embeddings @ self.v).view([-1, self.head, self.embedding_size // self.head])
 
         att = torch.einsum('ehd, ehd -> eh', q_embeddings, k_embeddings)
         att = torch.clamp(att, -10.0, 10.0)
@@ -169,16 +169,14 @@ class GTLayer(torch.nn.Module):
         att_norm = (tem.index_add_(0, rows, exp_att))[rows]
         att = exp_att / (att_norm + 1e-8)  # eh
 
-        if torch.cuda.device_count() > 1:
-            out_embeddings = torch.einsum('eh, ehd -> ehd', att.to('cuda:1'), v_embeddings).view([-1, self.embedding_size])
-        else:
-            out_embeddings = torch.einsum('eh, ehd -> ehd', att, v_embeddings).view([-1, self.embedding_size])
+        # if torch.cuda.device_count() > 1:
+        # out_embeddings = torch.einsum('eh, ehd -> ehd', att.to('cuda:1'), v_embeddings).view([-1, self.embedding_size])
+        out_embeddings = torch.einsum('eh, ehd -> ehd', att, v_embeddings).view([-1, self.embedding_size])
         tem = torch.zeros([all_embeddings.shape[0], self.embedding_size], dtype=out_embeddings.dtype, device=out_embeddings.device)
 
-        if torch.cuda.device_count() > 1:
-            out_embeddings = tem.index_add_(0, rows.to('cuda:1'), out_embeddings)  # nd
-        else:
-            out_embeddings = tem.index_add_(0, rows, out_embeddings)  # nd
+        # if torch.cuda.device_count() > 1:
+        # out_embeddings = tem.index_add_(0, rows.to('cuda:1'), out_embeddings)  # nd
+        out_embeddings = tem.index_add_(0, rows, out_embeddings)  # nd
 
         return out_embeddings.to(all_embeddings.device)
 

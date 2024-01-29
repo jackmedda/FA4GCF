@@ -7,6 +7,7 @@ import argparse
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.lines as mpl_lines
 import matplotlib.colors as mpl_colors
@@ -197,6 +198,7 @@ if __name__ == "__main__":
     first_total_df = pd.concat(first_merged_dfs_to_merge, axis=0, ignore_index=True)
     first_total_df.to_csv(os.path.join(os.path.dirname(out_path), 'total_raw_perc_table.csv'), index=False)
 
+    # Raw best settings utility and fairness
     first_best_settings = []
     first_best_settings_cols = ["Dataset", "Model", "GroupAttribute", "Policy"]
     first_total_gby = first_total_df.groupby(["Dataset", "Model", "Split", "Metric"])
@@ -230,6 +232,8 @@ if __name__ == "__main__":
         columns=["Model", "Metric"],
         values="Value"
     ).reindex(
+        ["Before", "After"], axis=0, level=2
+    ).reindex(
         ["NDCG", "$\Delta$"], axis=1, level=1
     )
 
@@ -262,6 +266,70 @@ if __name__ == "__main__":
             )
         )
 
+    # Mini Heatmaps
+    heatmaps_path = os.path.join(os.path.dirname(out_path), 'mini_heatmaps')
+    os.makedirs(heatmaps_path, exist_ok=True)
+
+    cmap = sns.color_palette("plasma", as_cmap=True)
+    first_total_heat_df = first_total_df[(first_total_df["Split"] == "Test") & (first_total_df["Metric"] == "DP")]
+    first_t_hm_gby = first_total_heat_df.groupby(["Model", "Dataset", "GroupAttribute"])
+    for mod in models_order:
+        mod_hm_df = first_total_heat_df[first_total_heat_df["Model"] == mod]
+        vmin, vmax = mod_hm_df["Value"].min(), mod_hm_df["Value"].max()
+        norm = mpl_colors.Normalize(vmin, vmax)
+
+        for dset in dataset_order:
+            for s_attr in ['Age', 'Gender']:
+                if (mod, dset, s_attr) not in first_t_hm_gby.groups:
+                    continue
+
+                mini_heat_df = first_t_hm_gby.get_group((mod, dset, s_attr))
+
+                mini_heatmap_path = os.path.join(heatmaps_path, mod, dset, s_attr)
+                os.makedirs(mini_heatmap_path, exist_ok=True)
+                if s_attr == "Age":
+                    continue
+
+                orig_policy_dp = mini_heat_df.loc[mini_heat_df["Policy"] == "Orig", "Value"].item()
+                user_mh_df = mini_heat_df[mini_heat_df["Policy"].isin(user_policies)].set_index("Policy").reindex(
+                    user_policies
+                )
+                item_mh_df = mini_heat_df[mini_heat_df["Policy"].isin(item_policies)].set_index("Policy").reindex(
+                    item_policies
+                )
+                user_item_mh_df = mini_heat_df[mini_heat_df["Policy"].isin(user_item_policies)]
+
+                user_item_mh_df[['U', 'I']] = user_item_mh_df['Policy'].str.split('+', expand=True).values
+                user_item_hmap_data = user_item_mh_df.pivot(columns='I', index='U', values='Value').reindex(
+                    user_policies, axis=0
+                ).reindex(
+                    item_policies, axis=1
+                ).values
+                user_hmap_data = user_mh_df.loc[:, "Value"].values
+                item_hmap_data = item_mh_df.loc[:, "Value"].values
+
+                data = np.hstack([user_hmap_data.reshape([-1, 1]), user_item_hmap_data])
+                data = np.vstack([np.concatenate([[orig_policy_dp], item_hmap_data]).reshape([1, -1]), data])
+                data = pd.DataFrame(data, index=[''] + user_policies, columns=[''] + item_policies)
+
+                fig, ax = plt.subplots(1, 1, figsize=(4, 4))
+                sns.heatmap(data, cmap=cmap, norm=norm, cbar=False, linewidths=.5, linecolor='k', ax=ax)
+                ax.tick_params(length=0)
+                ax.xaxis.tick_top()
+                fig.savefig(os.path.join(mini_heatmap_path, "mini_heatmap.png"), dpi=300, bbox_inches="tight", pad_inches=0)
+                plt.close(fig)
+
+        # saves model-specific colorbar
+        mappable = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
+        cbar_fig, cbar_ax = plt.subplots(1, 1, figsize=(10, 2))
+        colorbar = cbar_fig.colorbar(mappable, cax=cbar_ax, orientation="horizontal", drawedges=True)
+        colorbar.ax.set_xticklabels([float(t.get_text()) / 100 for t in colorbar.ax.get_xticklabels()])
+        cbar_fig.savefig(
+            os.path.join(heatmaps_path, mod, "heatmaps_colorbar.png"), dpi=300, bbox_inches="tight", pad_inches=0
+        )
+        plt.close(cbar_fig)
+
+    # Relative Delta %
     first_pval_df = first_df.copy(deep=True)
     first_pval_df['Value'] = first_pval_df[['Value', 'pvalue']].apply(lambda row: f"{row['Value']:.2f}{pval_symbol(row['pvalue'])}", axis=1)
     del first_pval_df['pvalue']

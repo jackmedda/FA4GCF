@@ -61,8 +61,8 @@ def get_dataloader_with_perturbed_edges(pert_edges: np.ndarray, config, dataset,
     train_sampler, valid_sampler, test_sampler = create_samplers(config, dataset, built_datasets)
 
     train_data = get_dataloader(config, 'train')(config, train_dataset, train_sampler, shuffle=False)
-    valid_data = get_dataloader(config, 'evaluation')(config, valid_dataset, valid_sampler, shuffle=False)
-    test_data = get_dataloader(config, 'evaluation')(config, test_dataset, test_sampler, shuffle=False)
+    valid_data = get_dataloader(config, 'valid')(config, valid_dataset, valid_sampler, shuffle=False)
+    test_data = get_dataloader(config, 'test')(config, test_dataset, test_sampler, shuffle=False)
 
     return train_data, valid_data, test_data
 

@@ -18,7 +18,7 @@ user_policy_order = ['ZN', 'FR', 'IR']
 item_policy_order = ['IP', 'IT', 'PR']
 
 datasets = [
-    # "rent_the_runway",
+    "rent_the_runway",
     "foursquare_nyc",
     "lastfm-1k",
     "foursquare_tky",
@@ -26,7 +26,7 @@ datasets = [
 ]
 
 models = [
-    # "rent_the_runway",
+    "AutoCF",
     "XSimGCL",
     "SGL",
     "UltraGCN",

@@ -12,6 +12,7 @@ from recbole.utils import init_logger, init_seed, set_color, get_local_time
 
 import fa4gcf.utils as utils
 from fa4gcf.config import Config
+from fa4gcf.model.utils import is_model_saveable
 from fa4gcf.data import Dataset, PerturbedDataset
 from fa4gcf.trainer import HyperTuning, TraditionalTrainer
 from explain import execute_explanation
@@ -78,7 +79,7 @@ def training(_config, saved=True, model_file=None, hyper=False, perturbed_datase
     best_valid_score, best_valid_result = trainer.fit(
         train_data,
         valid_data,
-        saved=saved and not isinstance(trainer, TraditionalTrainer),
+        saved=saved and is_model_saveable(_config, trainer),
         show_progress=_config['show_progress'] and not hyper,
         verbose=not hyper
     )
@@ -86,7 +87,7 @@ def training(_config, saved=True, model_file=None, hyper=False, perturbed_datase
     # model evaluation
     test_result = trainer.evaluate(
         test_data,
-        load_best_model=saved and not isinstance(trainer, TraditionalTrainer),
+        load_best_model=saved and is_model_saveable(_config, trainer),
         show_progress=_config['show_progress'] and not hyper
     )
 
@@ -227,6 +228,7 @@ def main(model=None,
         # logger.info(dataset)
 
         if args.run == 'train':
+            import pdb; pdb.set_trace()
             training(config, saved=saved, model_file=args.model_file)
         elif args.run == 'explain':
             import torch;
@@ -358,7 +360,8 @@ if __name__ == "__main__":
 
                     best_conf_dict = best_conf_dict[args.dataset.lower()][parametric]
                 else:
-                    config_dict.update(best_conf_dict[args.dataset.lower()])
+                    best_conf_dict = best_conf_dict[args.dataset.lower()]
+                config_dict.update(best_conf_dict)
 
         if args.use_perturbed_graph:
             if args.explainer_config_file:

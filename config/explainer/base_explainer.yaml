@@ -1,4 +1,4 @@
-enable_amp: True
+enable_amp: False
 
 unused_col: {}  # ensures all columns are taken (useful for the timestamp information during the perturbation)
 
