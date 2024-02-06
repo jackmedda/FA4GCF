@@ -1,6 +1,5 @@
 import torch
 from torch_geometric.typing import torch_sparse
-from torch_geometric.nn.conv.gcn_conv import gcn_norm
 
 from gnnuers.data import Dataset as GNNUERS_Dataset
 
@@ -41,11 +40,12 @@ class Dataset(GNNUERS_Dataset):
                     "Import `torch_sparse` error, please install corresponding version of `torch_sparse`."
                     "Dense edge_index will be used instead of SparseTensor in dataset."
                 )
-            else:
-                adj_t = self.edge_index_to_adj_t(edge_index, edge_weight, num_nodes, num_nodes)
-                adj_t = gcn_norm(adj_t, None, num_nodes, add_self_loops=self.add_self_loops)
-                return adj_t, None
 
-        edge_index, edge_weight = gcn_norm(edge_index, edge_weight, num_nodes, add_self_loops=self.add_self_loops)
-
-        return edge_index, edge_weight
+        return utils.get_norm_adj_mat(
+            edge_index,
+            edge_weight,
+            num_nodes,
+            add_self_loops=self.add_self_loops,
+            enable_sparse=enable_sparse,
+            is_sparse=self.is_sparse
+        )

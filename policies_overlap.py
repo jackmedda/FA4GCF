@@ -92,6 +92,8 @@ if __name__ == "__main__":
     )
     user_list = torch.arange(1, dataset.user_num)
 
+    if 'DeltaNDCG' in config['metrics']:
+        config['metrics'].remove('DeltaNDCG')
     perturbation_trainer = PerturbationTrainer(
         config,
         train_data.dataset,

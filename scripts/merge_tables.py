@@ -1,4 +1,5 @@
 import os
+import pdb
 import re
 import math
 import pickle
@@ -13,15 +14,16 @@ import matplotlib.lines as mpl_lines
 import matplotlib.colors as mpl_colors
 import matplotlib.ticker as mpl_tickers
 import matplotlib.patches as mpl_patches
+import matplotlib.transforms as mpl_trans
 import matplotlib.legend_handler as mpl_legend_handlers
 
 
 def update_plt_rc():
     SMALL_SIZE = 16
-    MEDIUM_SIZE = 18
-    BIGGER_SIZE = 20
+    MEDIUM_SIZE = 26
+    BIGGER_SIZE = 30
 
-    plt.rc('font', size=SMALL_SIZE)  # controls default text sizes
+    plt.rc('font', size=MEDIUM_SIZE)  # controls default text sizes
     plt.rc('axes', titlesize=BIGGER_SIZE)  # fontsize of the axes title
     plt.rc('axes', labelsize=BIGGER_SIZE)  # fontsize of the x and y labels
     plt.rc('xtick', labelsize=BIGGER_SIZE)  # fontsize of the tick labels
@@ -51,6 +53,7 @@ if __name__ == "__main__":
     parser.add_argument('--plots_path_to_merge', '--pptm', default=os.path.join(current_file, 'plots'))
     parser.add_argument('--base_plots_path', '--bpp', default=os.path.join(current_file, 'merged_plots'))
     parser.add_argument('--exclude', '--ex', nargs='+', help='Exclude certain config ids', default=None)
+    parser.add_argument('--psi_impact', action="store_true")
 
     args = parser.parse_args()
     args.dataset = args.dataset.lower()
@@ -63,11 +66,15 @@ if __name__ == "__main__":
     if not os.path.exists(out_path):
         os.makedirs(out_path)
 
+    PVAL_001 = '^'
+    PVAL_005 = '*'
+
+
     def pval_symbol(pval):
         if pval < 0.01:
-            return '^'
+            return PVAL_001
         elif pval < 0.05:
-            return '*'
+            return PVAL_005
 
         return ''
 
@@ -82,7 +89,7 @@ if __name__ == "__main__":
     user_item_policies = [f"{up}+{ip}" for up in user_policies for ip in item_policies]
 
     dataset_order = ['RENT', 'LF1K', 'FNYC', 'FTKY', 'ML1M']
-    models_order = ['AutoCF', 'DirectAU', 'HMLET', 'LightGCN', 'NCL', 'NGCF', 'SGL', 'SVD_GCN']
+    models_order = ['AutoCF', 'DirectAU', 'HMLET', 'LightGCN', 'NCL', 'NGCF', 'SGL', 'SVD-GCN', 'XSimGCL']
     policies_order = ['Orig'] + user_policies + item_policies + user_item_policies
     group_attr_order = ['Age', 'Gender']
     pert_type_order = ['Orig', 'Pert']
@@ -174,9 +181,10 @@ if __name__ == "__main__":
         'age': 'Age'
     }
 
+    orig_pert_pval_df = pd.DataFrame(orig_pert_pval_data, columns=orig_pert_pval_cols)
+
     cols_order = ["Dataset", "Model", "GroupAttribute", "Policy", "Split", "Metric", "Value", "pvalue"]
     first_df = pd.concat(loaded_dfs, ignore_index=True)
-    first_df["Policy"] = first_df["Policy"].str.replace("IP+IR", "IR+IP")
     first_df = first_df.melt(first_df.columns[~first_df.columns.isin([metric, 'DP'])], var_name='Metric', value_name='Value')
     first_df = first_df.drop_duplicates(subset=cols_order[:6])
     first_df = first_df[cols_order]
@@ -184,6 +192,9 @@ if __name__ == "__main__":
     first_df['Dataset'] = first_df['Dataset'].map(dataset_map)
     first_df['GroupAttribute'] = first_df['GroupAttribute'].map(group_attr_map)
     first_df.sort_values(cols_order[:5])
+
+    orig_pert_pval_df['Dataset'] = orig_pert_pval_df['Dataset'].map(dataset_map)
+    orig_pert_pval_df['GroupAttribute'] = orig_pert_pval_df['GroupAttribute'].map(group_attr_map)
 
     first_df['Value'] *= 100  # transform it to percentage
     first_df.to_csv(os.path.join(out_path, 'best_exp_raw_perc_values_table.csv'), index=False)
@@ -197,6 +208,124 @@ if __name__ == "__main__":
 
     first_total_df = pd.concat(first_merged_dfs_to_merge, axis=0, ignore_index=True)
     first_total_df.to_csv(os.path.join(os.path.dirname(out_path), 'total_raw_perc_table.csv'), index=False)
+
+    if args.psi_impact:
+        if first_total_df.Policy.str.contains('IP+IR', regex=False).any():
+            def remap_ipir_psi_values(val):
+                psi_values = re.search('(?<=\().*(?=\))', val)[0]
+                return f"IR+IP ({'+'.join(psi_values.split('+')[::-1])})"
+            first_total_df['Policy'] = first_total_df['Policy'].map(
+                lambda x: remap_ipir_psi_values(x) if 'IP+IR' in x else x
+            )
+        base_exp_ratios = '(0.35+0.2)'
+        # base_exp_mask = first_df.Policy.str.contains('(0.35+0.2)', regex=False)
+        # base_exp_df = first_df[base_exp_mask].reset_index(drop=True)
+        # psi_impact_df = first_df[~base_exp_mask].reset_index(drop=True)
+
+        first_total_df = first_total_df[first_total_df['Split'] == 'Test'].reset_index(drop=True)
+        dp_key = '$\Delta$'
+        first_total_df = first_total_df.replace('DP', dp_key)
+        fixed_user_psi = first_total_df[first_total_df['Policy'].str.contains('0.35+', regex=False)]
+        fixed_item_psi = first_total_df[first_total_df['Policy'].str.contains('+0.2', regex=False)]
+
+        for i, (fixed_psi_df, varying_psi_type) in enumerate(
+                zip([fixed_item_psi, fixed_user_psi], ['$\Psi_{\mathcal{U}}$', '$\Psi_{\mathcal{I}}$'])
+        ):
+            fig, axs = plt.subplots(len(fixed_psi_df['Dataset'].unique()), 1, figsize=(10, 8))  # , sharex='col')
+            fixed_psi_df[varying_psi_type] = fixed_psi_df['Policy'].map(
+                lambda p: p.split('(')[1].replace(')', '').split('+')[i]
+            ).astype(float)
+            fixed_psi_df['Policy'] = fixed_psi_df['Policy'].map(lambda p: p.split()[0])
+            fixed_psi_df['Setting'] = fixed_psi_df[['Policy', 'Dataset', 'Model', 'GroupAttribute']].apply(
+                lambda x: f'({",".join(x)})', axis=1
+            )
+
+            style_kws = dict(
+                style='Metric',
+                markers={dp_key: 'X', 'NDCG': 'P'},
+                dashes={dp_key: (), 'NDCG': (2, 1)},
+                errorbar=None,
+                lw=5,
+                markersize=30
+            )
+
+            psi_dsets_order = ['LF1K', 'ML1M']
+
+            fixed_psi_df_gby = fixed_psi_df.groupby('Dataset')
+            for dset_i, psi_dset in enumerate(psi_dsets_order):
+                dset_psi_df = fixed_psi_df_gby.get_group(psi_dset)
+                colors = sns.color_palette('cividis', n_colors=4)
+                ax_color, axx_color = colors[0], colors[-2]
+                axs[dset_i].margins(y=0.1)
+                sns.lineplot(
+                    x=varying_psi_type, y='Value', data=dset_psi_df[dset_psi_df['Metric'] == dp_key],
+                    color=ax_color, ax=axs[dset_i], **style_kws
+                )
+                axs[dset_i].set_xlabel('')
+                # axs[dset_i].set_ylabel(f'{dset_psi_df["Setting"].iloc[0]}\n{dp_key}', color=ax_color)
+                axs[dset_i].set_ylabel(dp_key, color=ax_color)
+                axs[dset_i].tick_params(axis='y', labelcolor=ax_color)
+
+                axx = axs[dset_i].twinx()
+                axx.margins(y=0.1)
+                sns.lineplot(
+                    x=varying_psi_type, y='Value', data=dset_psi_df[dset_psi_df['Metric'] == 'NDCG'],
+                    color=axx_color, ax=axx, **style_kws
+                )
+                axx.set_xlabel('')
+                axx.set_ylabel('NDCG', color=axx_color)
+                axx.tick_params(axis='y', labelcolor=axx_color)
+
+                axs[dset_i].grid(axis='both', which='major', ls=':', color='k')
+                axs[dset_i].set_xticks(fixed_psi_df[varying_psi_type].unique())
+                axs[dset_i].xaxis.set_major_formatter(mpl_tickers.FuncFormatter(lambda x, pos: f"{int(x * 100)}%"))
+                axs[dset_i].yaxis.set_major_formatter(mpl_tickers.StrMethodFormatter("{x:.2f}"))
+                axx.yaxis.set_major_formatter(mpl_tickers.StrMethodFormatter("{x:.2f}"))
+                axs[dset_i].yaxis.set_major_locator(mpl_tickers.LinearLocator(6))
+                axx.yaxis.set_major_locator(mpl_tickers.LinearLocator(6))
+
+                ax_handles, ax_labels = axs[dset_i].get_legend_handles_labels()
+                axx_handles, axx_labels = axx.get_legend_handles_labels()
+                handles, labels = ax_handles + axx_handles, ax_labels + axx_labels
+                axs[dset_i].get_legend().remove()
+                axx.get_legend().remove()
+
+            fig.subplots_adjust(hspace=0.5)
+            for dset_i, dset in enumerate(psi_dsets_order):
+                extent = axs[dset_i].get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+
+                # bbox_args = [1.7, 1.1] if i == 0 else [1.1, 1.1]
+                width = extent.width
+                height = extent.height
+                deltaw = (1.45 * width - width) / 2.0
+                deltah = (1.36 * height - height) / 2.0  # (1.115 * height - height) / 2.0 if dset_i == 0 else (1.315 * height - height) / 2.0
+                offsetw = -0.05 if dset_i == 0 or i == 0 else -0.14
+                offseth = -0.660  # -0.101 if dset_i == 0 else -0.660
+                a = np.array([[-deltaw - deltaw * offsetw, -deltah], [deltaw, deltah + deltah * offseth]])
+                new_bbox = extent._points + a
+                fig.savefig(
+                    os.path.join(
+                        os.path.dirname(out_path),
+                        dset + ('_user_' if i == 0 else '_item_') + 'varying_psi_lineplot.png'
+                    ),
+                    bbox_inches=mpl_trans.Bbox(new_bbox), dpi=300
+                )
+            plt.close(fig)
+
+        figlegend = plt.figure(figsize=(len(labels),  1))
+        figlegend.legend(
+            handles, labels, loc='center', frameon=False, fontsize=12, ncol=len(labels),
+            markerscale=0.7, handlelength=5, # handletextpad=4, columnspacing=2, borderpad=0.1
+        )
+        figlegend.savefig(
+            os.path.join(os.path.dirname(out_path), 'legend_psi_impact.png'),
+            dpi=300, bbox_inches="tight", pad_inches=0
+        )
+
+        exit()
+    else:
+        first_total_df['Policy'] = first_total_df['Policy'].str.replace('IP+IR', 'IR+IP')
+        orig_pert_pval_df['Policy'] = orig_pert_pval_df['Policy'].str.replace('IP+IR', 'IR+IP')
 
     # Raw best settings utility and fairness
     first_best_settings = []
@@ -223,19 +352,39 @@ if __name__ == "__main__":
         first_best_settings_cols[:-1] + ["Split", "Metric"]
     ).loc[test_bp_idx].reset_index()
 
+    before_key, after_key = "Base", "Aug"
     first_best_pol_orig_df = pd.concat([test_best_first_total_df, test_orig_first_total_df], axis=0, ignore_index=True)
     first_best_pol_orig_df["Model"] = first_best_pol_orig_df["Model"].replace('SVD_GCN', 'SVD-GCN')
     first_best_pol_orig_df["Metric"] = first_best_pol_orig_df["Metric"].replace('DP', '$\Delta$')
-    first_best_pol_orig_df["Status"] = first_best_pol_orig_df["Policy"].map(lambda p: "Before" if p == "Orig" else "After")
+    first_best_pol_orig_df["Status"] = first_best_pol_orig_df["Policy"].map(lambda p: before_key if p == "Orig" else after_key)
+    first_best_pol_orig_df["GroupAttribute"] = first_best_pol_orig_df["GroupAttribute"].map({"Gender": "G", "Age": "A"})
+
+    test_orig_pert_pval_df = orig_pert_pval_df[orig_pert_pval_df["Split"] == "Test"]
+    test_orig_pert_pval_df["Model"] = test_orig_pert_pval_df["Model"].replace('SVD_GCN', 'SVD-GCN')
+    test_orig_pert_pval_df["Metric"] = test_orig_pert_pval_df["Metric"].replace('DP', '$\Delta$')
+    test_orig_pert_pval_df["GroupAttribute"] = test_orig_pert_pval_df["GroupAttribute"].map({"Gender": "G", "Age": "A"})
+
+    pol_as_a_metric_df = first_best_pol_orig_df[(first_best_pol_orig_df["Status"] == "Aug") & (first_best_pol_orig_df["Metric"] == "NDCG")]
+    pol_as_a_metric_df["Value"] = pol_as_a_metric_df["Policy"].map(lambda p: "{\\small \\emph{" + p + "}}")
+    pol_as_a_metric_df["Metric"] = "PolAsMetric"
+
+    # first_best_pol_orig_df = pd.concat([first_best_pol_orig_df, pol_as_a_metric_df], axis=0, ignore_index=True)
+    pol_as_a_metric_df_pivot = pol_as_a_metric_df.pivot(
+        index=["Dataset", "GroupAttribute", "Status"],
+        columns=["Model", "Metric"],
+        values="Value"
+    )
+
     first_best_pol_orig_df_pivot = first_best_pol_orig_df.pivot(
         index=["Dataset", "GroupAttribute", "Status"],
         columns=["Model", "Metric"],
         values="Value"
     ).reindex(
-        ["Before", "After"], axis=0, level=2
+        [before_key, after_key], axis=0, level=2
     ).reindex(
         ["NDCG", "$\Delta$"], axis=1, level=1
     )
+    first_best_pol_orig_df_pivot.to_csv(os.path.join(os.path.dirname(out_path), "best_policy_compare_orig_dp_utility.csv"), sep='\t')
 
 
     def bold_row(row):
@@ -247,14 +396,47 @@ if __name__ == "__main__":
         row[best_dp_idx] = r"\textbf{" + row[best_dp_idx] + "}"
         return row
 
+
+    def underline_improvements(col):
+        float_col = col.str.replace(r"\textbf{", "").str.replace("}", "").astype(float)
+        status_index = float_col.index.get_level_values(level=2)
+        after_idx = float_col[status_index == after_key].values
+        before_idx = float_col[status_index == before_key].values
+        fn = "__gt__" if col.name[1] == "NDCG" else "__lt__"
+        hl_mask = getattr(after_idx - before_idx, fn)(0)
+        hl_idx = hl_mask.nonzero()[0] * 2 + 1
+        col[hl_idx] = r"\underline{" + col[hl_idx] + "}"
+        return col
+
     first_best_pol_orig_df_pivot = first_best_pol_orig_df_pivot.apply(bold_row, axis=1)
+    first_best_pol_orig_df_pivot = first_best_pol_orig_df_pivot.apply(underline_improvements, axis=0)
+    first_best_pol_orig_df_pivot = first_best_pol_orig_df_pivot.join(pol_as_a_metric_df_pivot).reindex(
+        models_order, axis=1, level=0
+    ).reindex(
+        ["PolAsMetric", "NDCG", "$\Delta$"], axis=1, level=1
+    )
+    first_best_pol_orig_df_pivot = first_best_pol_orig_df_pivot.fillna('').rename(columns={'PolAsMetric': ''})
+
     first_best_pol_orig_df_pivot.index.names = [""] * len(first_best_pol_orig_df_pivot.index.names)
     first_best_pol_orig_df_pivot.columns.names = [""] * len(first_best_pol_orig_df_pivot.columns.names)
+
+    pval_idx_columns = ["Dataset", "GroupAttribute", "Model", "Metric", "Policy"]
+    test_orig_pert_pval_df_idx = test_orig_pert_pval_df.set_index(pval_idx_columns)
+    for _, row in first_best_pol_orig_df_pivot.iterrows():
+        row_idx = row.name
+        for col_idx, _ in row.items():
+            row_col_policy = first_best_pol_orig_df_pivot.loc[row_idx, (*col_idx[:1], '')].split('{')[-1].split('}')[0]
+            if "Aug" in row_idx and '' not in col_idx:
+                pval_str = ""
+                if test_orig_pert_pval_df_idx.loc[(*row_idx[:2], *col_idx, row_col_policy), 'P_value'] < 0.05:
+                    pval_str = f"$^{PVAL_005}$"
+                row_col_val = first_best_pol_orig_df_pivot.loc[row_idx, col_idx]
+                first_best_pol_orig_df_pivot.loc[row_idx, col_idx] = pval_str + row_col_val
 
     with open(os.path.join(os.path.dirname(out_path), "best_policy_compare_orig_dp_utility.tex"), "w") as tex_file:
         tex_file.write(
             first_best_pol_orig_df_pivot.to_latex(
-                column_format="lll|rr|rr|rr|rr|rr|rr|rr|rr|rr",
+                column_format=">{\\raggedright}p{7.5mm}>{\\raggedright}p{1mm}l*{9}{|>{\\raggedright}p{2.5mm}rr}",
                 multicolumn=True,
                 multicolumn_format="c|",
                 multirow=True,
@@ -262,7 +444,9 @@ if __name__ == "__main__":
             ).replace(
                 "NDCG", r"NDCG $\uparrow$"
             ).replace(
-                "$\Delta$", "$\Delta$ $\downarrow$"
+                "$\Delta$", "$\Delta$ $\downarrow_0$"
+            ).replace(
+                "\multirow[t]", "\multirow[c]"
             )
         )
 
@@ -270,335 +454,71 @@ if __name__ == "__main__":
     heatmaps_path = os.path.join(os.path.dirname(out_path), 'mini_heatmaps')
     os.makedirs(heatmaps_path, exist_ok=True)
 
-    cmap = sns.color_palette("plasma", as_cmap=True)
-    first_total_heat_df = first_total_df[(first_total_df["Split"] == "Test") & (first_total_df["Metric"] == "DP")]
-    first_t_hm_gby = first_total_heat_df.groupby(["Model", "Dataset", "GroupAttribute"])
-    for mod in models_order:
-        mod_hm_df = first_total_heat_df[first_total_heat_df["Model"] == mod]
-        vmin, vmax = mod_hm_df["Value"].min(), mod_hm_df["Value"].max()
+    MAX_VMAX = 7
+    for spl in ["Valid", "Test"]:
+        cmap = sns.color_palette("cividis", as_cmap=True)
+        first_total_heat_df = first_total_df[(first_total_df["Split"] == spl) & (first_total_df["Metric"] == "DP")]
+        first_t_hm_gby = first_total_heat_df.groupby(["Model", "Dataset", "GroupAttribute"])
+        vmin, vmax = 0, min(MAX_VMAX, first_total_heat_df["Value"].max())
         norm = mpl_colors.Normalize(vmin, vmax)
+        for mod in models_order:
+            mod_hm_df = first_total_heat_df[first_total_heat_df["Model"] == mod]
+            for dset in dataset_order:
+                for s_attr in ['Age', 'Gender']:
+                    if (mod, dset, s_attr) not in first_t_hm_gby.groups:
+                        continue
 
-        for dset in dataset_order:
-            for s_attr in ['Age', 'Gender']:
-                if (mod, dset, s_attr) not in first_t_hm_gby.groups:
-                    continue
+                    mini_heat_df = first_t_hm_gby.get_group((mod, dset, s_attr))
 
-                mini_heat_df = first_t_hm_gby.get_group((mod, dset, s_attr))
+                    mini_heatmap_path = os.path.join(heatmaps_path, spl, mod)
+                    os.makedirs(mini_heatmap_path, exist_ok=True)
 
-                mini_heatmap_path = os.path.join(heatmaps_path, mod, dset, s_attr)
-                os.makedirs(mini_heatmap_path, exist_ok=True)
-                if s_attr == "Age":
-                    continue
+                    orig_policy_dp = mini_heat_df.loc[mini_heat_df["Policy"] == "Orig", "Value"].item()
+                    user_mh_df = mini_heat_df[mini_heat_df["Policy"].isin(user_policies)].set_index("Policy").reindex(
+                        user_policies
+                    )
+                    item_mh_df = mini_heat_df[mini_heat_df["Policy"].isin(item_policies)].set_index("Policy").reindex(
+                        item_policies
+                    )
+                    user_item_mh_df = mini_heat_df[mini_heat_df["Policy"].isin(user_item_policies)]
 
-                orig_policy_dp = mini_heat_df.loc[mini_heat_df["Policy"] == "Orig", "Value"].item()
-                user_mh_df = mini_heat_df[mini_heat_df["Policy"].isin(user_policies)].set_index("Policy").reindex(
-                    user_policies
-                )
-                item_mh_df = mini_heat_df[mini_heat_df["Policy"].isin(item_policies)].set_index("Policy").reindex(
-                    item_policies
-                )
-                user_item_mh_df = mini_heat_df[mini_heat_df["Policy"].isin(user_item_policies)]
+                    user_item_mh_df[['U', 'I']] = user_item_mh_df['Policy'].str.split('+', expand=True).values
+                    user_item_hmap_data = user_item_mh_df.pivot(columns='I', index='U', values='Value').reindex(
+                        user_policies, axis=0
+                    ).reindex(
+                        item_policies, axis=1
+                    ).values
+                    user_hmap_data = user_mh_df.loc[:, "Value"].values
+                    item_hmap_data = item_mh_df.loc[:, "Value"].values
 
-                user_item_mh_df[['U', 'I']] = user_item_mh_df['Policy'].str.split('+', expand=True).values
-                user_item_hmap_data = user_item_mh_df.pivot(columns='I', index='U', values='Value').reindex(
-                    user_policies, axis=0
-                ).reindex(
-                    item_policies, axis=1
-                ).values
-                user_hmap_data = user_mh_df.loc[:, "Value"].values
-                item_hmap_data = item_mh_df.loc[:, "Value"].values
+                    data = np.hstack([user_hmap_data.reshape([-1, 1]), user_item_hmap_data])
+                    data = np.vstack([np.concatenate([[orig_policy_dp], item_hmap_data]).reshape([1, -1]), data])
+                    data = pd.DataFrame(data, index=[''] + user_policies, columns=[''] + item_policies)
 
-                data = np.hstack([user_hmap_data.reshape([-1, 1]), user_item_hmap_data])
-                data = np.vstack([np.concatenate([[orig_policy_dp], item_hmap_data]).reshape([1, -1]), data])
-                data = pd.DataFrame(data, index=[''] + user_policies, columns=[''] + item_policies)
+                    # annot = np.full_like(data, fill_value='', dtype='<U4')
+                    greater_than_vmax_mask = data > MAX_VMAX
+                    annot = data.applymap("{:.2f}".format).values
+                    annot[0, 0] = "Base\n" + annot[0, 0]
+                    annot[greater_than_vmax_mask] = f"> {MAX_VMAX}"
 
-                fig, ax = plt.subplots(1, 1, figsize=(4, 4))
-                sns.heatmap(data, cmap=cmap, norm=norm, cbar=False, linewidths=.5, linecolor='k', ax=ax)
-                ax.tick_params(length=0)
-                ax.xaxis.tick_top()
-                fig.savefig(os.path.join(mini_heatmap_path, "mini_heatmap.png"), dpi=300, bbox_inches="tight", pad_inches=0)
-                plt.close(fig)
+                    fig, ax = plt.subplots(1, 1, figsize=(5, 5))
+                    sns.heatmap(
+                        data, cmap=cmap, norm=norm, annot=annot, fmt="", square=True,
+                        cbar=False, linewidths=.5, linecolor='white', ax=ax
+                    )
+                    ax.tick_params(length=0)
+                    ax.xaxis.tick_top()
+                    fig.savefig(
+                        os.path.join(mini_heatmap_path, f"{dset}_{s_attr}_mini_heatmap.png"),
+                        dpi=300, bbox_inches="tight", pad_inches=0
+                    )
+                    plt.close(fig)
 
-        # saves model-specific colorbar
         mappable = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
-        cbar_fig, cbar_ax = plt.subplots(1, 1, figsize=(10, 2))
-        colorbar = cbar_fig.colorbar(mappable, cax=cbar_ax, orientation="horizontal", drawedges=True)
-        colorbar.ax.set_xticklabels([float(t.get_text()) / 100 for t in colorbar.ax.get_xticklabels()])
+        cbar_fig, cbar_ax = plt.subplots(1, 1, figsize=(0.5, 10.8))
+        colorbar = cbar_fig.colorbar(mappable, cax=cbar_ax, orientation="vertical")
+        colorbar.ax.set_yticklabels([float(t.get_text()) for t in colorbar.ax.get_yticklabels()])
         cbar_fig.savefig(
-            os.path.join(heatmaps_path, mod, "heatmaps_colorbar.png"), dpi=300, bbox_inches="tight", pad_inches=0
+            os.path.join(heatmaps_path, spl, "heatmaps_colorbar.png"), dpi=300, bbox_inches="tight", pad_inches=0
         )
         plt.close(cbar_fig)
-
-    # Relative Delta %
-    first_pval_df = first_df.copy(deep=True)
-    first_pval_df['Value'] = first_pval_df[['Value', 'pvalue']].apply(lambda row: f"{row['Value']:.2f}{pval_symbol(row['pvalue'])}", axis=1)
-    del first_pval_df['pvalue']
-
-    rel_delta_col = 'Rel. $Delta$ (%)'
-    change_idx = ['Dataset', 'Model', 'GroupAttribute', 'Split', 'Metric', 'Policy']
-    final_idx_df = first_pval_df.set_index(change_idx)
-    for set_pert, gby_df in first_pval_df.groupby(change_idx[:-1]):
-        gby_pol_df = gby_df.set_index(['Policy'])
-        orig_val = float(remove_str_pval(gby_pol_df.loc['Orig', 'Value']))
-        for pol in gby_pol_df.index:
-            if pol != 'Orig':
-                pol_val = float(remove_str_pval(gby_pol_df.loc[pol, 'Value']))
-                pol_impact = (pol_val - orig_val) / orig_val * 100
-                if pol_impact > 100:
-                    pol_impact_bound = " ($>$+100%)"
-                elif pol_impact < -100:
-                    pol_impact_bound = " ($<$-100%)"
-                else:
-                    pol_impact_bound = f" ({pol_impact:+05.1f}%)"
-
-                final_idx_df.loc[tuple([*set_pert, pol]), 'Value'] += pol_impact_bound
-                final_idx_df.loc[tuple([*set_pert, pol]), rel_delta_col] = f"{pol_impact:.2f}"
-
-    final_df = final_idx_df.reset_index()
-
-    pivot_df = final_df.pivot(
-        columns=['Dataset', 'Model', 'Metric'],
-        index=['Split', 'Policy', 'GroupAttribute'],
-        values='Value'
-    )
-
-    pivot_df = pivot_df.reindex(
-        dataset_order, axis=1, level=0
-    ).reindex(
-        models_order, axis=1, level=1
-    ).reindex(
-        [metric, 'DP'], axis=1, level=2
-    ).reindex(
-        ['Valid', 'Test'], axis=0, level=0
-    ).reindex(
-        policies_order, axis=0, level=1
-    ).reindex(
-        group_attr_order, axis=0, level=2
-    )
-
-    pivot_df.to_csv(os.path.join(out_path, 'best_exp_change_table.csv'))
-
-    merged_dfs_to_merge = []
-    for dirpath, _, merged_csvs in os.walk(os.path.dirname(out_path)):
-        if merged_csvs and '.ipynb_checkpoints' not in dirpath:
-            for mc in merged_csvs:
-                if mc == 'best_exp_change_table.csv':
-                    merged_dfs_to_merge.append(pd.read_csv(os.path.join(dirpath, mc), index_col=[0,1,2], header=[0,1]))
-
-    total_df = pd.concat(merged_dfs_to_merge, axis=1)
-
-    # set_gr_idx = list(set([x[:2] for x in total_df.index]))
-    # for col in total_df.columns:
-    #     for sg_idx in set_gr_idx:
-    #         col_setting_df = total_df.loc[sg_idx, col]
-    #         to_hl = []
-    #         for cs_df_idx in col_setting_df.index:
-    #             if cs_df_idx != 'Orig':
-    #                 change = float(re.search("([+-]\d+[.]\d+)|([+-]\d+)", col_setting_df.loc[cs_df_idx]).group(0))
-    #                 if abs(change) < args.hl_threshold:
-    #                     to_hl.append(True)
-    #                 else:
-    #                     to_hl.append(False)
-    #         if all(to_hl):
-    #             for cs_df_idx in col_setting_df.index:
-    #                 if cs_df_idx != 'Orig':
-    #                     col_setting_df.loc[cs_df_idx] = "\cellcolor{lightgray} " + col_setting_df.loc[cs_df_idx]
-    #
-    #         for cs_df_idx in col_setting_df.index:
-    #             if cs_df_idx != 'Orig':
-    #                 val, ch = col_setting_df.loc[cs_df_idx].split('(')
-    #                 col_setting_df.loc[cs_df_idx] = val + '(\textit{' + ch[:-1] + '})'
-    #
-    #         # format cells with makecell
-    #         # for cs_df_idx in col_setting_df.index:
-    #         #     if cs_df_idx != 'Orig':
-    #         #         left_val, right_val = col_setting_df.loc[cs_df_idx].split(' (')
-    #         #         col_setting_df.loc[cs_df_idx] = "\makecell{" + left_val + r" \\ " + f"({right_val}" + "}"
-
-    total_df.columns.names = ['' for x in total_df.columns.names]
-    total_df.index.names = ['' for x in total_df.index.names]
-    total_df.index = pd.MultiIndex.from_tuples([(f"{x[0]} - {x[1]}" if 'C' in x[0] else x[0], x[2]) for x in total_df.index])
-    total_df.index = pd.MultiIndex.from_tuples([("\rotatebox[origin=c]{90}{" + x[0] + "}", x[1]) for x in total_df.index])
-
-    # re.sub('(?<=\d)\*', '{\\\\scriptsize *}', aa)
-    col_sep = "1.6cm"
-    n_cols = total_df.columns.shape[0]
-    with open(os.path.join(os.path.dirname(out_path), 'total_best_exp_change_table.tex'), 'w') as f:
-        f.write(
-            total_df.to_latex(
-                column_format='cM{1.2cm}|' + ''.join(['M{' + col_sep + '}' + ('' if (i + 1) % 3 != 0 or (i + 1) == n_cols else '|') for i in range(n_cols)]),
-                multicolumn_format='c',
-                multirow=True,
-                escape=False
-            ).replace(
-                '^', '\^{}'
-            ).replace(
-                '%', '\%'
-            ).replace(
-                '{*}', '{*}[-10pt]'
-            ).replace(
-                '{*}[-10pt]{\\rotatebox[origin=c]{90}{\\textbf{CS - Gender}', '{*}[-5pt]{\\rotatebox[origin=c]{90}{\\textbf{CS - Gender}'
-            ).replace(
-                '&       & \\multicolumn{3}{c}{INS}', '\\multicolumn{2}{c}{}       & \\multicolumn{3}{c}{INS}'
-            ).replace(
-                '\\cline{1-11}', '\\cline{2-11}\n\\cline{2-11}'
-            ).replace(
-                '\\bottomrule', '\\midrule\n\\bottomrule'
-            ).replace(
-                '\\toprule', '\\toprule\n\\midrule'
-            )
-        )
-
-    # NEW RQ1
-    P_VALUE_RQ1 = 0.05
-
-    delta_pivot_df = final_df.pivot(
-        columns=['Dataset', 'Model', 'Metric'],
-        index=['Split', 'Policy', 'GroupAttribute'],
-        values=rel_delta_col
-    ).dropna()
-
-    delta_pivot_df = delta_pivot_df.reindex(
-        dataset_order, axis=1, level=0
-    ).reindex(
-        models_order, axis=1, level=1
-    ).reindex(
-        [metric, 'DP'], axis=1, level=2
-    ).reindex(
-        ['Valid', 'Test'], axis=0, level=0
-    ).reindex(
-        policies_order, axis=0, level=1
-    ).reindex(
-        group_attr_order, axis=0, level=2
-    )
-
-    delta_pivot_df.to_csv(os.path.join(out_path, 'best_exp_rel_delta_change_table.csv'))
-
-    merged_delta_dfs_to_merge = []
-    for dirpath, _, merged_csvs in os.walk(os.path.dirname(out_path)):
-        if merged_csvs and '.ipynb_checkpoints' not in dirpath:
-            for mc in merged_csvs:
-                if mc == 'best_exp_rel_delta_change_table.csv':
-                    merged_delta_dfs_to_merge.append(pd.read_csv(os.path.join(dirpath, mc), index_col=[0,1,2], header=[0,1,2]))
-
-    delta_total_df = pd.concat(merged_delta_dfs_to_merge, axis=1)
-
-    delta_total_df = delta_total_df.reset_index().melt(["Split", "Policy", "GroupAttribute"], value_name=rel_delta_col)
-
-    orig_pert_pval_df = pd.DataFrame(orig_pert_pval_data, columns=orig_pert_pval_cols)
-    orig_pert_pval_df["Policy"] = orig_pert_pval_df["Policy"].str.replace("IP+IR", "IR+IP")
-    orig_pert_pval_df['Dataset'] = orig_pert_pval_df['Dataset'].map(dataset_map)
-    # orig_pert_pval_df['Model'] = orig_pert_pval_df['Model'].map(model_map)
-    orig_pert_pval_df['GroupAttribute'] = orig_pert_pval_df['GroupAttribute'].map(group_attr_map)
-
-    pval_join_cols = ["Dataset", "Model", "GroupAttribute", "Policy", "Split", "Metric"]
-    delta_total_df = delta_total_df.join(orig_pert_pval_df[pval_join_cols + ["P_value"]].set_index(pval_join_cols), on=pval_join_cols)
-    print(delta_total_df)
-    delta_total_df.to_csv(os.path.join(os.path.dirname(out_path), 'delta_total_change_table.csv'))
-
-    palette = dict(zip([pert_type_map['Perturbed | addition'], pert_type_map['Perturbed | deletion']], sns.color_palette("colorblind")))
-    markers = dict(zip([pert_type_map['Perturbed | addition'], pert_type_map['Perturbed | deletion']], ["s", "o"]))
-    p_val_hatch = '+'
-    markersize=20
-
-    sns.set_context("paper")
-    update_plt_rc()
-    plt.rc('xtick', labelsize=15)
-    plt.rc('ytick', labelsize=16)
-
-    xlims = {
-        "GCMC": (3 * -10 ** 2, 10 ** 5 - 1),
-        "LGCN": (3 * -10 ** 2, 10 ** 5 - 1),
-        "NGCF": (3 * -10 ** 2, 10 ** 5 - 1)
-    }
-    delta_total_df_gby = delta_total_df.groupby("Dataset")
-    for dset in dataset_order:
-        if dset not in delta_total_df_gby.groups:
-            continue
-        delta_total_dset_df = delta_total_df_gby.get_group(dset)
-        delta_total_dset_df_gby = delta_total_dset_df.groupby("Stakeholder")
-
-        handles, labels = None, None
-        fig = plt.figure(figsize=(6 * len(models_order), 2.8 if dset == 'LF1K' else 3), constrained_layout=True)
-        height_ratios = (2, 1)
-        gs = fig.add_gridspec(
-            2, len(models_order),  height_ratios=height_ratios,
-            # left=0.1, right=0.9, bottom=0.1, top=0.9,
-            wspace=0.01
-        )
-
-        for plot_i, sk in enumerate(["Consumer", "Provider"]):
-            delta_total_sk_df = delta_total_dset_df_gby.get_group(sk)
-            delta_total_sk_gby = delta_total_sk_df.groupby("Model")
-            for plot_j, mod in enumerate(models_order):
-                delta_total_mod_df = delta_total_sk_gby.get_group(mod)
-
-                kws = {}
-                if plot_i > 0:
-                    kws['sharex'] = fig.axes[plot_j]
-                if plot_j > 0:
-                    kws['sharey'] = fig.axes[gs.ncols * plot_i]
-                ax = fig.add_subplot(gs[plot_i, plot_j], **kws)
-
-                for pt_idx, (pt, delta_pt_df) in enumerate(delta_total_mod_df.groupby("Perturbation Type")):
-                    sns.stripplot(
-                        data=delta_pt_df, x="Rel. $Delta$ (%)", y="FullSetting", hue="Perturbation Type", palette={pt: palette[pt]},
-                        marker=markers[pt], size=markersize, orient="h", jitter=False, linewidth=1, edgecolor="w", ax=ax
-                    )
-
-                    pt_collections = ax.collections[(pt_idx * len(delta_pt_df) + 1 * pt_idx):-1]
-                    for collection, pval in zip(pt_collections, delta_pt_df['P_value'].values):
-                        if pval < P_VALUE_RQ1:
-                            collection.set_hatch(p_val_hatch)
-
-                if handles is None and labels is None:
-                    handles, labels = ax.get_legend_handles_labels()
-                ax.get_legend().remove()
-
-        for row in range(gs.nrows):
-            for col in range(gs.ncols):
-                ax = fig.axes[row * gs.ncols + col]
-
-                if row < (gs.nrows - 1):
-                    ax.tick_params(bottom=False, labelbottom=False)
-                if col > 0:
-                    ax.tick_params(left=False, labelleft=False)
-
-                if dset == dataset_order[0] and row == 0:
-                    ax.set_title(models_order[col])
-                ax.set(xlabel='', ylabel='', xscale='symlog')
-                ax.xaxis.grid(True)
-                ax.yaxis.grid(True)
-                ax.autoscale(False)
-                # print(dset, sk, models_order[col], ax.get_xlim())
-                ax.set_xlim(xlims[models_order[col]])
-                if dset != "ML1M":
-                    ax.tick_params(bottom=False, labelbottom=False)
-                # xlim = ax.get_xlim()
-                # ax.set_xlim((xlim[0] * (0.2 if dset == "INS" else 1), xlim[1] * 1.5))
-                # if dset == "ML1M":
-                #     ax.set_xlim((xlim[0] * 0.9, xlim[1] * 1.48))
-                ax.plot([0, 0], list(ax.get_ylim()), "k", ls='-', lw=3, clip_on=False)
-
-        handles, labels = map(list, zip(*[(h, l) for i, (h, l) in enumerate(zip(handles, labels)) if l not in labels[:i]]))
-        handles = [mpl_lines.Line2D([], [], color=hand.get_facecolor(), marker=markers[lab], linestyle='None', markersize=markersize) for hand, lab in zip(handles, labels)]
-        handles.extend(
-            [
-                mpl_lines.Line2D([], [], alpha=0),
-                mpl_patches.Circle((20, 4), radius=20, facecolor="w", edgecolor="k", hatch=p_val_hatch),
-                mpl_patches.Circle((20, 4), radius=20, facecolor="w", edgecolor="k")
-            ]
-        )
-        labels.extend(["Wilcoxon signed-rank\n test on $\Delta$ with 5% CI", "Significant", "Not Significant"])
-        handles = [mpl_lines.Line2D([], [], alpha=0), *handles]
-        labels = ['Perturbation\n      Type', *labels]
-
-        figlegend = plt.figure(figsize=(len(labels), 1))
-        figlegend.legend(
-            handles, labels, loc='center', frameon=False, fontsize=15, ncol=len(labels),
-            handler_map={mpl_patches.Circle: HandlerEllipse()}
-            # markerscale=1.8, handletextpad=0.1, columnspacing=1, borderpad=0.1
-        )
-        figlegend.savefig(os.path.join(args.base_plots_path, 'legend_delta_dotplot.png'), dpi=300, bbox_inches="tight", pad_inches=0)
-
-        fig.savefig(os.path.join(args.base_plots_path, f'{dset}_delta_dotplot.png'), dpi=300, bbox_inches="tight", pad_inches=0)

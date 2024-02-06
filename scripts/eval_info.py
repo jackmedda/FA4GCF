@@ -31,6 +31,7 @@ if __name__ == "__main__":
     parser.add_argument('--exp_path', '--e', required=True)
     parser.add_argument('--base_plots_path', '--bpp', default=os.path.join('scripts', 'plots'))
     parser.add_argument('--gpu_id', default=1)
+    parser.add_argument('--psi_impact', action="store_true")
     args = parser.parse_args()
 
     consumer_group_map = {
@@ -100,12 +101,18 @@ if __name__ == "__main__":
         'items_pagerank_constraint': pagerankitems_pol
     }
 
-    exp_policies = [policy_map[k] for k, v in config['explainer_policies'].items() if v and k in policy_map]
+    raw_exp_policies = [k for k, v in config['explainer_policies'].items() if v and k in policy_map]
+    exp_policies = [policy_map[k] for k in raw_exp_policies]
     curr_policy = '+'.join(exp_policies)
 
     edge_additions = config['edge_additions']
     eval_metric = config['eval_metric'].upper()
     plots_path = os.path.join(args.base_plots_path, dset, mod, s_attr, f"{cid}_{curr_policy}")
+    if args.psi_impact:
+        exp_policies_ratios = [config[k + "_ratio"] for k in raw_exp_policies]
+        ratios_str = f" ({'+'.join(map(str, exp_policies_ratios))})"
+        plots_path += ratios_str
+        curr_policy += ratios_str
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
 

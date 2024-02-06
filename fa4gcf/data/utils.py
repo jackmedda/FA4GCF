@@ -2,6 +2,7 @@ from typing import Union
 
 import torch
 from torch_geometric.typing import SparseTensor
+from torch_geometric.nn.conv.gcn_conv import gcn_norm
 
 
 def symmetrically_sort(idxs: torch.Tensor, value: torch.Tensor = None):
@@ -90,3 +91,15 @@ def edge_index_to_adj_t(edge_index, edge_weight, m_num_nodes, n_num_nodes):
         sparse_sizes=(m_num_nodes, n_num_nodes)
     )
     return adj.t()
+
+
+def get_norm_adj_mat(edge_index, edge_weight, num_nodes, add_self_loops=False, enable_sparse=False, is_sparse=False):
+    if enable_sparse:
+        if is_sparse:
+            adj_t = edge_index_to_adj_t(edge_index, edge_weight, num_nodes, num_nodes)
+            adj_t = gcn_norm(adj_t, None, num_nodes, add_self_loops=add_self_loops)
+            return adj_t, None
+
+    edge_index, edge_weight = gcn_norm(edge_index, edge_weight, num_nodes, add_self_loops=add_self_loops)
+
+    return edge_index, edge_weight

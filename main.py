@@ -6,6 +6,7 @@ import inspect
 import argparse
 import logging
 
+import torch
 import numpy as np
 import pandas as pd
 from recbole.utils import init_logger, init_seed, set_color, get_local_time
@@ -181,57 +182,19 @@ def main(model=None,
 
     # logger initialization
     init_logger(config)
-
-    # if args.run == 'evaluate_perturbed' or args.run == 'graph_stats':
-    #     orig_config, orig_model, orig_dataset, orig_train_data, orig_valid_data, orig_test_data = \
-    #         utils.load_data_and_model(args.original_model_file, args.explainer_config_file)
+    logger = logging.getLogger()
 
     if args.use_perturbed_graph:
-        import torch;
-        torch.use_deterministic_algorithms(True)
+        logger.info(
+            f"Training with perturbed graph with {args.best_exp} exp from explanations_path: {args.explanations_path}"
+        )
         perturbed_dataset = PerturbedDataset(config, args.explanations_path, args.best_exp)
         if args.run == 'train':
             training(config, saved=saved, model_file=args.model_file, perturbed_dataset=perturbed_dataset)
-            # elif args.run == 'explain':
-            #     runner(*explain_args)
-            # elif args.run == 'evaluate_perturbed':
-            #     logger.info("EVALUATE PERTURBED MODEL")
-            #     _, pert_model, pert_dataset, _, _, _ = utils.load_data_and_model(args.model_file,
-            #                                                                      args.explainer_config_file)
-            #     runner(
-            #         orig_config,
-            #         orig_model,
-            #         pert_model,
-            #         orig_dataset,
-            #         pert_dataset,
-            #         orig_train_data,
-            #         orig_test_data,
-            #         topk=args.topk,
-            #         perturbed_model_file=os.path.splitext(os.path.basename(args.model_file))[0]
-            #     )
-            # elif args.run == 'graph_stats':
-            #     pert_config, _, _, pert_train_data, _, _ = utils.load_data_and_model(args.model_file,
-            #                                                                          args.explainer_config_file)
-            #     runner(
-            #         pert_config,
-            #         orig_train_data,
-            #         orig_valid_data,
-            #         orig_test_data,
-            #         pert_train_data,
-            #         args.original_model_file,
-            #         sens_attr,
-            #         c_id,
-            #         *args.best_exp
-            #     )
     else:
-        # dataset = create_dataset(config)
-        # logger.info(dataset)
-
         if args.run == 'train':
-            import pdb; pdb.set_trace()
             training(config, saved=saved, model_file=args.model_file)
         elif args.run == 'explain':
-            import torch;
             torch.use_deterministic_algorithms(True)
             execute_explanation(config, args.model_file, *explain_args)
         elif args.run == 'recbole_hyper':

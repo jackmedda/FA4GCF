@@ -49,8 +49,6 @@ def extract_metrics_from_perturbed_edges(exp_info: dict,
 
             checkpoint = torch.load(model_file)
             config = checkpoint['config']
-            if mod.lower() == "svd_gcn":
-                config['user_coefficient'] = config['item_coefficient'] = 0
 
             exp_dset = dset.replace('-1000', '') if '-1000' in dset else dset
             explainer_config_file = os.path.join(
@@ -62,6 +60,10 @@ def extract_metrics_from_perturbed_edges(exp_info: dict,
             config.final_config_dict.update(explain_config_dict)
 
             config['data_path'] = config['data_path'].replace('\\', os.sep)
+            if mod == "SVD_GCN":
+                # it could lead to an excessive amount of memory not used during evaluation
+                config['user_coefficient'] = 0
+                config['item_coefficient'] = 0
 
             dataset = Dataset(config)
             uid_field = dataset.uid_field
@@ -129,6 +131,7 @@ def extract_metrics_from_perturbed_edges(exp_info: dict,
     return (*out, exp_pref_data) if return_pref_data else tuple(out)
 
 
+@torch.no_grad()
 def pref_data_from_checkpoint(config,
                               checkpoint,
                               train_data,
@@ -144,7 +147,7 @@ def pref_data_from_checkpoint(config,
     tot_item_num = train_data.dataset.item_num
     item_tensor = train_data.dataset.get_item_feature().to(model.device)
     test_batch_size = tot_item_num
-    model_scores = gnnuers.utils.get_scores(model, batched_data, tot_item_num, test_batch_size, item_tensor)
+    model_scores = get_scores(model, batched_data, tot_item_num, item_tensor)
     _, model_topk_idx = gnnuers.utils.get_top_k(model_scores, topk=10)
     model_topk_idx = model_topk_idx.detach().cpu().numpy()
 
@@ -153,6 +156,7 @@ def pref_data_from_checkpoint(config,
     return pref_data
 
 
+@torch.no_grad()
 def pref_data_from_checkpoint_and_perturbed_edges(config,
                                                   checkpoint,
                                                   pert_edges,
@@ -183,10 +187,35 @@ def pref_data_from_checkpoint_and_perturbed_edges(config,
     item_tensor = train_data.dataset.get_item_feature().to(model.device)
     test_batch_size = tot_item_num
 
-    model_scores = gnnuers.utils.get_scores(model, batched_data, tot_item_num, test_batch_size, item_tensor)
+    model_scores = get_scores(model, batched_data, tot_item_num, item_tensor)
     _, model_topk_idx = gnnuers.utils.get_top_k(model_scores, topk=10)
     model_topk_idx = model_topk_idx.detach().cpu().numpy()
 
     pref_data = pd.DataFrame(zip(user_data.numpy(), model_topk_idx), columns=['user_id', 'cf_topk_pred'])
 
     return pref_data
+
+
+def get_scores(model, batched_data, tot_item_num, item_tensor, **kwargs):
+    interaction, history_index, _, _ = batched_data
+    inter_data = interaction.to(model.device)
+    full_sort_predict = False
+    try:
+        scores = model.full_sort_predict(inter_data, **kwargs)
+        full_sort_predict = True
+    except NotImplementedError:
+        scores = []
+        for user_i in range(len(inter_data)):
+            new_inter = inter_data[[user_i]].repeat_interleave(tot_item_num)
+            new_inter.update(item_tensor)
+            scores.append(model.predict(new_inter, **kwargs))
+        scores = torch.cat(scores, dim=0)
+
+    scores = scores.view(-1, tot_item_num)
+    scores[:, 0] = -np.inf
+    if model.ITEM_ID in interaction and full_sort_predict:
+        scores = scores[:, inter_data[model.ITEM_ID]]
+    if history_index is not None:
+        scores[history_index] = -np.inf
+
+    return scores
