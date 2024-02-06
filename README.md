@@ -1,4 +1,4 @@
-![zenodo 10625046](https://github.com/jackmedda/FA4GCF/assets/26059819/c37df9bc-f54b-496a-b179-b63a5de48381)# Fair Augmentation for Graph Collaborative Filtering (FA4GCF)
+# Fair Augmentation for Graph Collaborative Filtering (FA4GCF)
 
 FA4GCF is a framework that extends the codebase of [GNNUERS](https://github.com/jackmedda/RS-BGExplainer/tree/main/gnnuers),
 an approach that leverages edge-level perturbations to provide explanations of consumer unfairness and mitigate
