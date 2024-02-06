@@ -1,15 +1,26 @@
 # Fair Augmentation for Graph Collaborative Filtering (FA4GCF)
 
-FA4GCF generates explanations in the form of user-item interactions that make
-a GNN-based recommender system favor a demographic group over another. \
-FA4GCF learns a perturbation vector that modifies the adjacency matrix representing
-the training network. The edges modified by the perturbation vector are the explanations
-genereated by the framework. \
-FA4GCF then needs to work on a slight extended version of a recommender system
-in order to include the perturbation vector. In our study we applied our framework on
-GCMC, LightGCN and NGCF, all provided in the [Recbole](https://github.com/RUCAIBox/RecBole)
-library, from which FA4GCF depend on for the data handling, the training and evaluation.
-Instead, the provided models are independent of the Recbole library.
+FA4GCF is a framework that extends the codebase of [GNNUERS](https://github.com/jackmedda/RS-BGExplainer/tree/main/gnnuers),
+an approach that leverages edge-level perturbations to provide explanations of consumer unfairness and mitigate
+the latter as well.
+FA4GCF operates on GNN-based recommender systems as GNNUERS, but the base approach was extensively modularized,
+re-adapted, and reworked to offer a simple interface for including new tools.
+We focus on the adoption of GNNUERS for consumer unfairness mitigation, which leverages a set of policies that
+sample the user or item set to restrict the perturbation process on specific and valuable portions of the graph.
+In such a scenario, the graph perturbations are conceived only as edge additions, i.e. user-item interactions.
+The edges are added only to the disadvantaged group (enjoying a lower recommendation utility), such that the
+resulting overall utility of the group matches that of the advantaged group.
+
+We provide an improved modularization for datasets (perturbed and non), models based on torch-geometric, and
+sampling policies.
+FA4GCF relies better on the tools provided by [Recbole](https://github.com/RUCAIBox/RecBole) compared with GNNUERS,
+such as (i) integrating a GNN inside the augmentation model, instead of manually writing a perturbed version, (ii)
+adopting a trainer that extends a PyTorch module to perform the augmentation process, (iii) using a specific interface
+to manage the sampling policies and the possibility to add a sampling policy as a mere class method applied
+on the user or item set.
+
+Most of the models are taken from the Recbole sister library, named [Recbole-GNN](https://github.com/RUCAIBox/RecBole-GNN/tree/main),
+while other ones, namely AutoCF, GFCF, SVD-GCN, UltraGCN, were implemented according to their original repository.
 
 # Requirements
 Our framework was tested on Python 3.9 with the libraries listed in the
@@ -17,58 +28,45 @@ Our framework was tested on Python 3.9 with the libraries listed in the
 ```bash
 pip install -r FA4GCF/requirements.txt
 ```
-Some dependencies related to PyTorch, e.g. torch-scatter, could be hard to retrieve
+However, some dependencies, e.g. torch-scatter, could be hard to retrieve
 directly from pip depending on the PyTorch and CUDA version you are using, so you should
 specify the PyTorch FTP link storing the right libraries versions.
-For instance to install the right version of torch-scatter for PyTorch 1.12.0
+For instance to install the right version of torch-scatter for PyTorch 2.1.2
 you should use the following command:
 ```bash
-pip install torch-scatter -f https://data.pyg.org/whl/torch-1.12.0+${CUDA}.html
+pip install torch-scatter -f https://data.pyg.org/whl/torch-2.1.2+${CUDA}.html
 ```
 where `${CUDA}` should be replaced by either `cpu`, `cu***`, where `***` represents the
-CUDA version, e.g. 116, 117.
-
-__NOTE!__ \
-The Recbole Dataset class does not support the usage of custom dataset splits like ours,
-and we cannot guarantee that, even if provided in new versions, it will match our
-modification. Hence, we implemented a modified [Dataset](FA4GCF/data/dataset.py) on top of the Recbole one,
-which support the usage of custom data splits, and it is used to perform our experiments
-
-The current versions of Recbole also contain a bug related to the NGCF model. A Dropout layer is instantiated inside
-the `forward` method, which makes the generation of new embeddings (after the perturbation) not reproducible
-even if `eval` is called on the model. To run our experiments, we fixed this issue by creating an extended
-[NGCF](FA4GCF/models/ngcf.py) version on top of the respective Recbole model.
+CUDA version, e.g. 117, 121.
+__NOTE!__: several models rely on the cuda implementations of some operations provided by torch-scatter and
+torch-geometric. We do not guarantee FA4GCF will work on CPU.
 
 # Datasets
 
-The datasets used in our experiments are MovieLens 1M, Last.FM 1K, Ta Feng, Insurance and
-can be downloaded from [Zenodo](https://doi.org/10.5281/zenodo.7602406).
+The datasets used in our experiments are Foursquare New York City (FNYC),
+Foursquare Tokyo (FKTY), MovieLens 1M (ML1M), Last.FM 1K (LF1K), Rent The Runway (RENT) and
+can be downloaded from [Zenodo](https://zenodo.org/doi/10.5281/zenodo.10625045).
 They should be placed in a folder named _dataset_ in the project root folder,
 so next to the _config_ and _FA4GCF_ folders, e.g.:
 ```
 |-- config/*
 |-- dataset |-- ml-1m
             |-- lastfm-1k
-|-- FA4GCF/*
+|-- fa4gcf/*
 ```
 
 # Usage
 
-The file [main.py](FA4GCF/main.py) is the entry point for every step to execute in our pipeline.
+The file [main.py](fa4gcf/main.py) is the entry point for every step to execute our pipeline.
 
 ## 1. Configuration
 
 FA4GCF scripts are based on similar Recbole config files that can be found in the
--[config](config) folder. The structure is hierarchical, hence the file _base_explainer.yaml_
--can be used to set the parameters shared for all the experiments and for each dataset specify
--the necessary parameters.
--For each dataset there is a config file for:
-- __training__: it is named after the dataset, e.g. _ml-1m.yaml_ for MovieLens-1M,
-_tafeng.yaml_ for Ta Feng
-- __explaining__: the suffix __explainer_ is added to training config filename, e.g.
-_ml-1m_explainer.yaml_ for MovieLens 1M, _tafeng_explainer.yaml_ for Ta Feng
+-[config](config) folder, with specifics files for each dataset, model, and the augmentation process of each dataset.
+Config files are sequentially handled, so if multiple config files contain the same parameters, the used values pertain
+to the last config file that appear in the sequence.
 
-The __training__ config type parameters description can be found in the Recbole repository
+The description of the parameters used to train the base model can be found in the Recbole repository
 and website, except for this part:
 ```yaml
 eval_args:
@@ -77,66 +75,86 @@ eval_args:
     group_by: '-'
     mode: 'full'
 ```
-where `LRS` (Load Ready Splits) is not a Recbole split type, but it is added in
-our _modified_recbole_dataset.py_ to support custom data splits.
+where `LRS` (Load Ready Splits) is not a Recbole split type, but it is added in our
+extended Dataset class to support custom data splits.
 
-The description of each parameter in the __explaining__ config type can be found in the
-relative files. In particular, for the explainer_policies:
-- __force_removed_edges__: it should be always True to reproduce our results, it represents
-the policy that prevents the restore of a previously deleted edge, such that the edges
-deletions follow a monotonic trend
-- edge_additions: True => edges are added, not removed
-- exp_rec_data: "test" => the ground truth lables of the test set are used to measure the approximated NDCG
-- __only_adv_group__: "local" => the global issue is measured w.r.t to each batch
-- __perturb_adv_group__: the group to be perturbed. False to perturb the disadvantaged group, used when adding nodes.
-  True to perturb the advantaged group, used when removing nodes.
-- __group_deletion_constraint__: it is the Connected Nodes (CN) policy
-- __random_perturbation__: if True executes the baseline algorithm RND-P
+The description of each parameter in the __explainer__ config type can be found in the respective files.
+In particular, some parameters are related to the original study, and we report them for simplicity:
+- `__force_removed_edges__: False` prevents the deletion of a previously added edge. Not used
+- `edge_additions: True` => edges are added, not removed
+- `exp_rec_data: valid` => the ground truth labels of the validation set are used to measure the approximated NDCG
+- `__only_adv_group__: global` => fairness is measured w.r.t the advantaged group utility reported by the base model
+- `__perturb_adv_group__: False` >= the group to be perturbed. False perturbs the edges connecting users of
+  the disadvantaged group
+- `__group_deletion_constraint__: True`: runs the augmentation solely on the disadvantaged group if
+  `__perturb_adv_group__` is `False`, otherwise the advantaged group
+- `__gradient_deactivation_constraint__: True`: deactivates the gradient computation of the group not targeted by
+  the augmentation process. Not used when `__only_adv_group__` is `global`.
+- `__random_perturbation__: False`. Not used
 
 ## 2. Train Recommender System
 
 The recommender systems need first to be trained:
 ```bash
-python -m FA4GCF.main --run train --model MODEL --dataset DATASET --config_file_list config/TRAINING_CONFIG.yaml
+python -m FA4GCF.main \
+--run train \
+--model MODEL \
+--dataset DATASET \
+--config_file_list config/dataset/DATASET.yaml config/model/MODEL.yaml
 ```
-where __MODEL__ should be one of [GCMC, LightGCN, NGCF], __DATASET__ should match the folder
-of dataset, e.g. insurance, ml-1m, __TRAINING_CONFIG__ should be a config file of the
-__training__ type.
+where __MODEL__ and __DATASET__ denote the model and dataset for the training experiment.
+`--config_file_list` can be omitted and the corresponding config files will be automatically loaded if they exist.
+`--use_best_params` is a parameter that can be added to use the optimized hyperparameters for each model and dataset
+that can match the format `oonfig/model/MODEL_best.yaml`
 
-## 3. Train FA4GCF explainer
+## 3. Train the FA4GCF Augmentation Process
 ```bash
-python -m FA4GCF.main --run explain --model MODEL --dataset DATASET --config_file_list config/TRAINING_CONFIG.yaml --explainer_config_file config/EXPLAINING_CONFIG.yaml --model_file saved/MODEL_FILE
+python -m FA4GCF.main \
+--run explain \
+--model MODEL \
+--dataset DATASET \
+--config_file_list config/dataset/DATASET.yaml config/MODEL/MODEL.yaml \
+--explainer_config_file config/explainer/DATASET_explainer.yaml \
+--model_file saved/MODEL_FILE
 ```
-where __MODEL__, __DATASET__, __TRAINING_CONFIG__ were already explained above.
-__EXPLAINING_CONFIG__ should be the config file relative to the same dataset.
-
-# FA4GCF Output
-
-FA4GCF creates a folder
-_FA4GCF/experiments/dp_explanations/DATASET/MODEL/dpbg/LOSS_TYPE/SENSITIVE_ATTRIBUTE/epochs_EPOCHS/CONF_ID_
+where __MODEL_FILE__ is the path of the trained MODEL on DATASET. It can be omitted if the default path `saved` is used.
+The algorithm will create a folder with a format similar to
+_FA4GCF/experiments/dp_explanations/DATASET/MODEL/PerturbationTrainer/LOSS_TYPE/SENSITIVE_ATTRIBUTE/epochs_EPOCHS/CONF_ID_
 where __SENSITIVE_ATTRIBUTE__ can be one of [gender, age], __EPOCHS__ is the number of
-epochs used to train FA4GCF, __CONF_ID__ is the configuration/run ID of the just run
-experiment. The folder contains the __EXPLAINING_CONFIG__ file in yaml and pkl format used
-for the experiment, a file _cf_data.pkl_ containing the information about the perturbed edges for each epoch,
-a file _model_rec_test_preds.pkl_ containing the original recommendations on the rec (perturbation) set and
-test set, a file _users_order_.pkl containing the users ids in the order _model_rec_test_preds.pkl_ are sorted,
+epochs used to train FA4GCF, __CONF_ID__ is the configuration/run ID of the run experiment trial.
+The folder contains the updated config file specified in `--explainer_config_file` in yaml and pkl format,
+a file _cf_data.pkl_ containing the information about the edges added to the graph for each epoch,
+a file _model_rec_test_preds.pkl_ containing the original recommendations on the validation set and
+test set, a file _users_order.pkl_ containing the users ids in the order _model_rec_test_preds.pkl_ are sorted,
 a file _checkpoint.pth_ containing data used to resume the training if stopped earlier.
 
-_cf_data.pkl_ file contains a list of lists where each inner list has 5 values, relative to the perturbed edges at a certain epoch:
+_cf_data.pkl_ file contains a list of lists where each inner list has 5 values, relative to the edges
+added to the graph at a certain epoch:
 1) FA4GCF total loss
 2) FA4GCF distance loss
 3) FA4GCF fair loss
 4) fairness measured with the __fair_metric__ (absolute difference of NDCG)
-5) the perturbed edges in a 2xN array, where the first row contains the user ids,
-the second the item ids, such that each one of the N columns is a perturbed edge
+5) the added edges in a 2xN array, where the first row contains the user ids,
+the second the item ids, such that each one of the N columns is a new edge of the augmented graph
 6) epoch relative to the generated explanations
+
+## 4. Re-Train a Recommender system with an augmented graph
+```bash
+python -m FA4GCF.main \
+--run train \
+--model MODEL \
+--dataset DATASET \
+--config_file_list config/dataset/DATASET.yaml config/model/MODEL.yaml \
+--use_perturbed_graph \
+--best_exp fairest \
+--explanations_path AUGMENTED_GRAPH_PATH
+```
+where `--best_exp fairest` specifies that the augmented graph should include the edges that reported the fairest
+recommendations, which is based on the early stopping criterion (if the patience is 5, the augmented graph banally
+pertains to the edges at the position -5 of _cf_data.pkl_, i.e. `cf_data[-5]`), __AUGMENTED_GRAPH_PATH__ is the path
+that was created by FA4GCF at step 3, from which the augmented graph is built and used to train the chosen model.
+By default, the process saves the model in the __AUGMENTED_GRAPH_PATH__ with the name format of the base model.
 
 # Plotting
 
-The scripts inside the folder [scripts](scripts) can be used to plot the
-results used in the paper. They should be run from the root folder of this project.
-[eval_info.py](scripts/eval_info.py) can be used as follows:
-```bash
-python scripts/eval_info.py --e biga/experiments/dp_explanations/DATASET/MODEL/dpbg/LOSS_TYPE/SENSITIVE_ATTRIBUTE/epochs_EPOCHS/CONF_ID
-```
-where the argument --e stands for the path of a specific experiment.
+The scripts inside the folder [scripts](scripts) can be used to plot the results used in the paper.
