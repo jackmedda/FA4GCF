@@ -1,4 +1,4 @@
-# Fair Augmentation for Graph Collaborative Filtering (FA4GCF)
+![zenodo 10625046](https://github.com/jackmedda/FA4GCF/assets/26059819/c37df9bc-f54b-496a-b179-b63a5de48381)# Fair Augmentation for Graph Collaborative Filtering (FA4GCF)
 
 FA4GCF is a framework that extends the codebase of [GNNUERS](https://github.com/jackmedda/RS-BGExplainer/tree/main/gnnuers),
 an approach that leverages edge-level perturbations to provide explanations of consumer unfairness and mitigate
@@ -13,8 +13,8 @@ resulting overall utility of the group matches that of the advantaged group.
 
 We provide an improved modularization for datasets (perturbed and non), models based on torch-geometric, and
 sampling policies.
-FA4GCF relies better on the tools provided by [Recbole](https://github.com/RUCAIBox/RecBole) compared with GNNUERS,
-such as (i) integrating a GNN inside the augmentation model, instead of manually writing a perturbed version, (ii)
+Compared with GNNUERS, FA4GCF better incorporates [Recbole](https://github.com/RUCAIBox/RecBole),
+such as (i) dynamically integrating the GNNs with an augmentation model, instead of manually writing a perturbed version, (ii)
 adopting a trainer that extends a PyTorch module to perform the augmentation process, (iii) using a specific interface
 to manage the sampling policies and the possibility to add a sampling policy as a mere class method applied
 on the user or item set.
@@ -41,7 +41,8 @@ CUDA version, e.g. 117, 121.
 __NOTE!__: several models rely on the cuda implementations of some operations provided by torch-scatter and
 torch-geometric. We do not guarantee FA4GCF will work on CPU.
 
-# Datasets
+# Datasets [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10625046.svg)](https://doi.org/10.5281/zenodo.10625046)
+
 
 The datasets used in our experiments are Foursquare New York City (FNYC),
 Foursquare Tokyo (FKTY), MovieLens 1M (ML1M), Last.FM 1K (LF1K), Rent The Runway (RENT) and
