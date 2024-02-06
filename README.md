@@ -16,8 +16,7 @@ sampling policies.
 Compared with GNNUERS, FA4GCF better incorporates [Recbole](https://github.com/RUCAIBox/RecBole),
 such as (i) dynamically integrating the GNNs with an augmentation model, instead of manually writing a perturbed version, (ii)
 adopting a trainer that extends a PyTorch module to perform the augmentation process, (iii) using a specific interface
-to manage the sampling policies and the possibility to add a sampling policy as a mere class method applied
-on the user or item set.
+to manage the sampling policies usage and addition as a mere class method applied on the user or item set.
 
 Most of the models are taken from the Recbole sister library, named [Recbole-GNN](https://github.com/RUCAIBox/RecBole-GNN/tree/main),
 while other ones, namely AutoCF, GFCF, SVD-GCN, UltraGCN, were implemented according to their original repository.
