@@ -4,6 +4,7 @@ import copy
 import yaml
 import warnings
 import importlib
+import functools
 from logging import getLogger
 from typing import Literal
 
@@ -28,7 +29,7 @@ from recbole.data.utils import (
 from gnnuers.data import Interaction
 
 from fa4gcf.data import Dataset
-from fa4gcf.data.custom_dataloader import SVD_GCNDataLoader
+from fa4gcf.data.custom_dataloader import *
 
 
 def get_dataset_with_perturbed_edges(pert_edges: np.ndarray, dataset):
@@ -259,7 +260,8 @@ def get_dataloader(config, phase: Literal["train", "valid", "test", "evaluation"
         )
 
     register_table = {
-        "SVD_GCN": _get_SVD_GCN_dataloader
+        "SVD_GCN": functools.partial(_get_custom_train_dataloader, train_dataloader=SVD_GCNDataLoader),
+        "AutoCF": functools.partial(_get_custom_train_dataloader, train_dataloader=AutoCFDataLoader)
     }
 
     if config["model"] in register_table:
@@ -268,7 +270,9 @@ def get_dataloader(config, phase: Literal["train", "valid", "test", "evaluation"
         return get_recbole_dataloader(config, phase)
 
 
-def _get_SVD_GCN_dataloader(config, phase: Literal["train", "valid", "test", "evaluation"]):
+def _get_custom_train_dataloader(config,
+                                 phase: Literal["train", "valid", "test", "evaluation"],
+                                 train_dataloader: TrainDataLoader = None):
     """Customized function for SVD_GCN to get correct dataloader class.
 
     Args:
@@ -291,7 +295,7 @@ def _get_SVD_GCN_dataloader(config, phase: Literal["train", "valid", "test", "ev
         )
 
     if phase == "train":
-        return SVD_GCNDataLoader
+        return train_dataloader
     else:
         eval_mode = config["eval_args"]["mode"][phase]
         if eval_mode == "full":

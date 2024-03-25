@@ -23,10 +23,12 @@ def training(_config, saved=True, model_file=None, hyper=False, perturbed_datase
     logger = logging.getLogger() if not hyper else None
 
     if model_file is not None and perturbed_dataset is None:
-        _config, _model, _dataset, train_data, valid_data, test_data = utils.load_data_and_model(
+        loaded_config, _model, _dataset, train_data, valid_data, test_data = utils.load_data_and_model(
             model_file,
+            explainer_config=_config.final_config_dict,  # not used for explanation, but to update params
             perturbed_dataset=perturbed_dataset
         )
+        loaded_config.final_config_dict.update(_config.final_config_dict)
     else:
         # dataset filtering
         _dataset = perturbed_dataset if perturbed_dataset is not None else Dataset(_config)

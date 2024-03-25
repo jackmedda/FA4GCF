@@ -1,3 +1,5 @@
+import warnings
+
 import torch
 import numpy as np
 from recbole.utils.enum_type import InputType
@@ -199,3 +201,13 @@ class SVD_GCNDataLoader(NegSampleUserItemNeighborDataLoader):
             output_data = self._item_neighbor_sampling(transformed_data, output_data)
 
         return output_data
+
+
+class AutoCFDataLoader(TrainDataLoader):
+    def __init__(self, config, dataset, sampler, shuffle=False):
+        neg_sample_num = config["train_neg_sample_args"]["sample_num"]
+        if neg_sample_num > 1:
+            warnings.warn("AutoCF does not use negative sampling. Setting [sample_num] to 1.")
+
+        config["train_neg_sample_args"]["sample_num"] = 1
+        super().__init__(config, dataset, sampler, shuffle=shuffle)
