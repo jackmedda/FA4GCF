@@ -58,7 +58,7 @@ class AutoCF(GeneralGraphRecommender):
         embeddings_list = [all_embeddings]
 
         for gcn_layer_idx in range(self.n_gcn_layers):
-            all_embeddings = self.gcn_conv(all_embeddings, encoder_edge_index, encoder_edge_weight)
+            all_embeddings = self.gcn_conv(embeddings_list[-1], encoder_edge_index, encoder_edge_weight)
             embeddings_list.append(all_embeddings)
 
         if decoder_edge_index is not None:
@@ -203,17 +203,25 @@ class LocalGraphSampler(torch.nn.Module):
         :return:
         """
         # all_ones_adj should be with self-loops
+        # if edge_weight is None:
+        #     all_ones_adj = edge_index.fill_value(1).add(
+        #         edge_index.eye(*edge_index.sparse_sizes(), device=edge_index.device())
+        #     )
+        # else:
+        #     adj = torch.sparse_coo_tensor(
+        #         indices=edge_index,
+        #         values=torch.ones_like(edge_weight, device=edge_weight.device),
+        #         size=(all_embeddings.shape[0], all_embeddings.shape[0])
+        #     )
+        #     all_ones_adj = adj + torch.eye(all_embeddings.shape[0], dtype=adj.dtype, device=adj.device)
         if edge_weight is None:
-            all_ones_adj = edge_index.fill_value(1).add(
-                edge_index.eye(*edge_index.sparse_sizes(), device=edge_index.device())
-            )
+            all_ones_adj = edge_index.fill_value(1)
         else:
-            adj = torch.sparse_coo_tensor(
+            all_ones_adj = torch.sparse_coo_tensor(
                 indices=edge_index,
                 values=torch.ones_like(edge_weight, device=edge_weight.device),
                 size=(all_embeddings.shape[0], all_embeddings.shape[0])
             )
-            all_ones_adj = adj + torch.eye(all_embeddings.shape[0], dtype=adj.dtype, device=adj.device)
 
         order = all_ones_adj.sum(dim=-1).to_dense().view([-1, 1])
         first_embeddings = all_ones_adj.matmul(all_embeddings) - all_embeddings

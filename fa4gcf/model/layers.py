@@ -14,7 +14,7 @@ class LightGCNConv(MessagePassing):
         return self.propagate(edge_index, x=x, edge_weight=edge_weight)
 
     def message(self, x_j, edge_weight):
-        return edge_weight.view(-1, 1) * x_j
+        return x_j if edge_weight is None else edge_weight.view(-1, 1) * x_j
 
     def message_and_aggregate(self, adj_t, x):
         return matmul(adj_t, x, reduce=self.aggr)
@@ -32,7 +32,7 @@ class BipartiteGCNConv(MessagePassing):
         return self.propagate(edge_index, x=x, edge_weight=edge_weight, size=size)
 
     def message(self, x_j, edge_weight):
-        return edge_weight.view(-1, 1) * x_j
+        return x_j if edge_weight is None else edge_weight.view(-1, 1) * x_j
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.dim)
