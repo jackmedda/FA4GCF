@@ -3,15 +3,11 @@ import numpy as np
 from torch_geometric.typing import SparseTensor
 from recbole.model.abstract_recommender import GeneralRecommender as RecboleModel  # to inherit model attributes
 
-import gnnuers.models.utils as model_utils
-import gnnuers.explainers.utils as pert_utils
-
 import fa4gcf.data.utils as data_utils
+import fa4gcf.evaluation as eval_utils
 from fa4gcf.model.perturbed_recommender.customized_perturbation import PerturbationApplier
 from fa4gcf.model.general_recommender import (
-    DirectAU,
     LightGCL,
-    GFCF,
     SVD_GCN
 )
 
@@ -79,12 +75,12 @@ class PygPerturbedModel(RecboleModel):
     def load_cf_state_dict(self, ckpt):
         self.graph_perturbation_layer.load_cf_state_dict(ckpt)
 
-    def loss(self, scores_args, fair_loss_f, fair_loss_target):
+    def loss(self, scores_args, main_loss_f, main_loss_target):
         """
 
         :param scores_args: arguments to compute cf_model scores
-        :param fair_loss_f: fair loss function
-        :param fair_loss_target: fair loss target
+        :param main_loss_f: fair loss function
+        :param main_loss_target: fair loss target
 
         :return:
         """
@@ -100,13 +96,13 @@ class PygPerturbedModel(RecboleModel):
         else:
             cf_adj.requires_grad = True
 
-        cf_scores = pert_utils.get_scores(self, *scores_args, pred=False)
+        cf_scores = eval_utils.get_scores(self, *scores_args, pred=False)
         cf_scores = torch.nan_to_num(  # remove neginf from output
             cf_scores, neginf=(torch.min(cf_scores[~torch.isinf(cf_scores)]) - 1).item()
         )
 
-        ########### Fair Loss ###########
-        fair_loss = fair_loss_f(cf_scores, fair_loss_target)
+        ########### Main Loss ###########
+        fair_loss = main_loss_f(cf_scores, main_loss_target)
 
         ########### Dist Loss ###########
         if isinstance(cf_adj, SparseTensor):
@@ -268,10 +264,10 @@ class GraphPerturbation(torch.nn.Module):
 
             if filtered_users is not None:
                 filtered_users = filtered_users.to(self.mask_sub_adj.device)
-                filtered_nodes_mask = model_utils.edges_filter_nodes(self.mask_sub_adj[[0]], filtered_users)
+                filtered_nodes_mask = data_utils.edges_filter_nodes(self.mask_sub_adj[[0]], filtered_users)
                 if filtered_items is not None:
                     filtered_items = filtered_items.to(self.mask_sub_adj.device)
-                    filtered_nodes_mask &= model_utils.edges_filter_nodes(
+                    filtered_nodes_mask &= data_utils.edges_filter_nodes(
                         self.mask_sub_adj[[1]], filtered_items + n_users
                     )
 
@@ -294,11 +290,11 @@ class GraphPerturbation(torch.nn.Module):
 
             if filtered_users is not None and self.random_perturb_p is None:
                 filtered_users = filtered_users.to(self.mask_filter.device)
-                self.mask_filter &= model_utils.edges_filter_nodes(mask_sub_adj, filtered_users)
+                self.mask_filter &= data_utils.edges_filter_nodes(mask_sub_adj, filtered_users)
 
             if filtered_items is not None:
                 filtered_items = filtered_items.to(self.mask_filter.device)
-                self.mask_filter &= model_utils.edges_filter_nodes(mask_sub_adj, filtered_items + n_users)
+                self.mask_filter &= data_utils.edges_filter_nodes(mask_sub_adj, filtered_items + n_users)
 
     def update_neighborhood(self, nodes: torch.Tensor):
         if self.mask_neighborhood is None:
@@ -306,7 +302,7 @@ class GraphPerturbation(torch.nn.Module):
                 "neighborhood can be updated only on edge deletion and if the config parameter is set"
             )
         nodes = nodes.flatten().to(self.mask_sub_adj.device)
-        nodes_filter = model_utils.edges_filter_nodes(self.mask_sub_adj[:, :self.mask_neighborhood.shape[0]], nodes)
+        nodes_filter = data_utils.edges_filter_nodes(self.mask_sub_adj[:, :self.mask_neighborhood.shape[0]], nodes)
         self._update_neighborhood(nodes_filter)
 
     def _update_neighborhood(self, nhood: torch.Tensor):

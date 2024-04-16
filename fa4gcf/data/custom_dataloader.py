@@ -5,7 +5,7 @@ import numpy as np
 from recbole.utils.enum_type import InputType
 from recbole.data.dataloader.general_dataloader import TrainDataLoader
 
-from gnnuers.data import Interaction
+from fa4gcf.data import Interaction
 
 
 class NegSampleUserItemNeighborDataLoader(TrainDataLoader):

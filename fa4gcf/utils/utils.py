@@ -1,15 +1,12 @@
-import logging
 import os
-import copy
+import pickle
 import yaml
-import warnings
 import importlib
 import functools
-from logging import getLogger
 from typing import Literal
 
-import torch
-import numpy as np
+import wandb
+import numba
 from recbole.sampler import KGSampler
 from recbole.data.dataloader import *
 from recbole.trainer import Trainer as RecboleTrainer
@@ -25,52 +22,13 @@ from recbole.data.utils import (
     save_split_dataloaders,
     get_dataloader as get_recbole_dataloader
 )
-
-from gnnuers.data import Interaction
+from recbole.utils.argument_list import dataset_arguments
 
 from fa4gcf.data import Dataset
 from fa4gcf.data.custom_dataloader import *
 
 
-def get_dataset_with_perturbed_edges(pert_edges: np.ndarray, dataset):
-    user_num = dataset.user_num
-    uid_field, iid_field = dataset.uid_field, dataset.iid_field
-    pert_edges = pert_edges.copy()
-
-    pert_edges = torch.tensor(pert_edges)
-    pert_edges[1] -= user_num  # remap items in range [0, item_num)
-
-    orig_inter_feat = dataset.inter_feat
-    pert_inter_feat = {}
-    for i, col in enumerate([uid_field, iid_field]):
-        pert_inter_feat[col] = torch.cat((orig_inter_feat[col], pert_edges[i]))
-
-    unique, counts = torch.stack(
-        (pert_inter_feat[uid_field], pert_inter_feat[iid_field]),
-    ).unique(dim=1, return_counts=True)
-    pert_inter_feat[uid_field], pert_inter_feat[iid_field] = unique[:, counts == 1]
-
-    return dataset.copy(Interaction(pert_inter_feat))
-
-
-def get_dataloader_with_perturbed_edges(pert_edges: np.ndarray, config, dataset, train_data, valid_data, test_data):
-    pert_edges = pert_edges.copy()
-
-    train_dataset = get_dataset_with_perturbed_edges(pert_edges, train_data.dataset)
-    valid_dataset = get_dataset_with_perturbed_edges(pert_edges, valid_data.dataset)
-    test_dataset = get_dataset_with_perturbed_edges(pert_edges, test_data.dataset)
-
-    built_datasets = [train_dataset, valid_dataset, test_dataset]
-    train_sampler, valid_sampler, test_sampler = create_samplers(config, dataset, built_datasets)
-
-    train_data = get_dataloader(config, 'train')(config, train_dataset, train_sampler, shuffle=False)
-    valid_data = get_dataloader(config, 'valid')(config, valid_dataset, valid_sampler, shuffle=False)
-    test_data = get_dataloader(config, 'test')(config, test_dataset, test_sampler, shuffle=False)
-
-    return train_data, valid_data, test_data
-
-
-def load_data_and_model(model_file, explainer_config=None, cmd_config_args=None, perturbed_dataset=None):
+def load_data_and_model(model_file, perturbation_config=None, cmd_config_args=None, perturbed_dataset=None):
     r"""Load filtered dataset, split dataloaders and saved model.
     Args:
         model_file (str): The path of saved model file.
@@ -86,14 +44,14 @@ def load_data_and_model(model_file, explainer_config=None, cmd_config_args=None,
     checkpoint = torch.load(model_file)
     config = checkpoint['config']
 
-    if explainer_config is not None:
-        if isinstance(explainer_config, str):
-            with open(explainer_config, 'r', encoding='utf-8') as f:
+    if perturbation_config is not None:
+        if isinstance(perturbation_config, str):
+            with open(perturbation_config, 'r', encoding='utf-8') as f:
                 explain_config_dict = yaml.load(f.read(), Loader=config.yaml_loader)
-        elif isinstance(explainer_config, dict):
-            explain_config_dict = explainer_config
+        elif isinstance(perturbation_config, dict):
+            explain_config_dict = perturbation_config
         else:
-            raise ValueError(f'explainer_config cannot be `{type(explainer_config)}`. Only `str` and `dict` are supported')
+            raise ValueError(f'explainer_config cannot be `{type(perturbation_config)}`. Only `str` and `dict` are supported')
 
         config.final_config_dict.update(explain_config_dict)
 
@@ -361,3 +319,90 @@ def get_trainer(model_type, model_name):
                     RuntimeWarning
                 )
                 return loaded_recbole_trainer
+
+
+def wandb_init(config, policies=None, **kwargs):
+    config = config.final_config_dict if not isinstance(config, dict) else config
+
+    tags = None
+    policies = config.get("explainer_policies", policies)
+    if policies is not None:
+        tags = [k for k in policies if policies[k]]
+    config['wandb_tags'] = tags
+
+    return wandb.init(
+        **kwargs,
+        tags=tags,
+        config=config
+    )
+
+
+def damerau_levenshtein_distance(s1, s2):
+    import numpy as np
+
+    s1 = [s1] if np.ndim(s1) == 1 else s1
+    s2 = [s2] if np.ndim(s2) == 1 else s2
+
+    out = np.zeros((len(s1, )), dtype=int)
+    for i, (_s1, _s2) in enumerate(zip(s1, s2)):
+        try:
+            numb_s1, numb_s2 = numba.typed.List(_s1), numba.typed.List(_s2)
+        except TypeError:  # python < 3.8
+            numb_s1, numb_s2 = numba.typed.List(), numba.typed.List()
+            for el in _s1:
+                numb_s1.append(el)
+            for el in _s2:
+                numb_s2.append(el)
+
+        out[i] = _damerau_levenshtein_distance(numb_s1, numb_s2)
+
+    return out.item() if out.shape == (1,) else out
+
+
+@numba.jit(nopython=True)
+def _damerau_levenshtein_distance(s1, s2):
+    """
+    Copyright (c) 2015, James Turk
+    https://github.com/jamesturk/jellyfish/blob/main/jellyfish/_jellyfish.py
+    """
+
+    # _check_type(s1)
+    # _check_type(s2)
+
+    len1 = len(s1)
+    len2 = len(s2)
+    infinite = len1 + len2
+
+    # character array
+    da = {}
+
+    # distance matrix
+    score = [[0] * (len2 + 2) for _ in range(len1 + 2)]
+
+    score[0][0] = infinite
+    for i in range(0, len1 + 1):
+        score[i + 1][0] = infinite
+        score[i + 1][1] = i
+    for i in range(0, len2 + 1):
+        score[0][i + 1] = infinite
+        score[1][i + 1] = i
+
+    for i in range(1, len1 + 1):
+        db = 0
+        for j in range(1, len2 + 1):
+            i1 = da[s2[j - 1]] if s2[j - 1] in da else 0
+            j1 = db
+            cost = 1
+            if s1[i - 1] == s2[j - 1]:
+                cost = 0
+                db = j
+
+            score[i + 1][j + 1] = min(
+                score[i][j] + cost,
+                score[i + 1][j] + 1,
+                score[i][j + 1] + 1,
+                score[i1][j1] + (i - i1 - 1) + 1 + (j - j1 - 1),
+            )
+        da[s1[i - 1]] = i
+
+    return score[len1 + 1][len2 + 1]

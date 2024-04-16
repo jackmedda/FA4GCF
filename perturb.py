@@ -1,35 +1,30 @@
 import os
-import re
 import json
 import yaml
 import pickle
 import logging
 import inspect
-import argparse
 
-import wandb
 import torch
 import optuna
 import pandas as pd
 
 from recbole.data.dataloader import FullSortEvalDataLoader
 
-import gnnuers.utils as utils
-
-from fa4gcf.utils import load_data_and_model
-from fa4gcf.trainer import PerturbationTrainer
+import fa4gcf.utils as utils
+from fa4gcf.trainer import BeyondAccuracyPerturbationTrainer
 
 
 script_path = os.path.abspath(os.path.dirname(inspect.getsourcefile(lambda: 0)))
 
 
-def get_base_exps_filepath(config,
-                           config_id=-1,
-                           model_name=None,
-                           model_file="",
-                           hyper=False):
+def get_base_perts_filepath(config,
+                            config_id=-1,
+                            model_name=None,
+                            model_file="",
+                            hyper=False):
     """
-    return the filepath where explanations are saved
+    return the filepath where perturbations are saved
     :param config:
     :param config_id:
     :param model_name:
@@ -38,17 +33,17 @@ def get_base_exps_filepath(config,
     """
     epochs = config["cf_epochs"]
     model_name = model_name or config["model"]
-    explainer = PerturbationTrainer.__name__
-    exp_type = "dp_explanations" if not hyper else "hyperoptimization"
-    base_exps_file = os.path.join(script_path, "experiments", exp_type, config["dataset"], model_name, explainer)
+    perturber = BeyondAccuracyPerturbationTrainer.__name__
+    pert_type = "dp_perturbations" if not hyper else "hyperoptimization"
+    base_perts_file = os.path.join(script_path, "experiments", pert_type, config["dataset"], model_name, perturber)
 
-    exp_metadata = config["sensitive_attribute"].lower() if 'consumer' in config["exp_metric"].lower() else ''
-    exp_loss = config["exp_metric"] + "_loss"
-    base_exps_file = os.path.join(base_exps_file, exp_loss, exp_metadata, f"epochs_{epochs}")
+    pert_metadata = config["sensitive_attribute"].lower() if 'consumer' in config["pert_metric"].lower() else ''
+    pert_loss = config["pert_metric"] + "_loss"
+    base_perts_file = os.path.join(base_perts_file, pert_loss, pert_metadata, f"epochs_{epochs}")
 
-    if os.path.exists(base_exps_file):
+    if os.path.exists(base_perts_file):
         if config_id == -1:
-            paths_c_ids = sorted(filter(str.isdigit, os.listdir(base_exps_file)), key=int)
+            paths_c_ids = sorted(filter(str.isdigit, os.listdir(base_perts_file)), key=int)
             if len(paths_c_ids) == 0:
                 config_id = 1
             else:
@@ -57,38 +52,38 @@ def get_base_exps_filepath(config,
                 config_id = str(min(candidates, default=max(int_paths_c_ids) + 1))
 
             for path_c in paths_c_ids:
-                config_path = os.path.join(base_exps_file, path_c, "config.pkl")
+                config_path = os.path.join(base_perts_file, path_c, "config.pkl")
                 if os.path.exists(config_path):
                     with open(config_path, 'rb') as f:
                         _c = pickle.load(f)
 
                     if config.final_config_dict == _c.final_config_dict:
                         if model_file != "" and "perturbed" in model_file:
-                            check_perturb = input("The explanations of the perturbed graph could overwrite the "
-                                                  "explanations from which the perturbed graph was generated. Type "
+                            check_perturb = input("The perturbations of the perturbed graph could overwrite the "
+                                                  "perturbations from which the perturbed graph was generated. Type "
                                                   "y/yes to confirm this outcome. Other inputs will assign a new id: ")
                             if check_perturb.lower() != "y" and check_perturb.lower() != "yes":
                                 continue
-                        config_id = os.path.join(base_exps_file, str(path_c))
+                        config_id = os.path.join(base_perts_file, str(path_c))
                         break
                 elif hyper:
-                    config_id = os.path.join(base_exps_file, str(path_c))
+                    config_id = os.path.join(base_perts_file, str(path_c))
                     break
 
-        base_exps_file = os.path.join(base_exps_file, str(config_id))
+        base_perts_file = os.path.join(base_perts_file, str(config_id))
     else:
-        base_exps_file = os.path.join(base_exps_file, "1")
+        base_perts_file = os.path.join(base_perts_file, "1")
 
-    if not os.path.exists(base_exps_file):
-        os.makedirs(base_exps_file)
+    if not os.path.exists(base_perts_file):
+        os.makedirs(base_perts_file)
 
-    with open(os.path.join(base_exps_file, "config.yaml"), 'w') as exp_file:
-        exp_file.write(yaml.dump(config.final_config_dict, default_flow_style=False))
+    with open(os.path.join(base_perts_file, "config.yaml"), 'w') as pert_file:
+        pert_file.write(yaml.dump(config.final_config_dict, default_flow_style=False))
 
-    return base_exps_file
+    return base_perts_file
 
 
-def perturb(config, model, _rec_data, _full_dataset, _train_data, _valid_data, _test_data, base_exps_file, **kwargs):
+def perturb(config, model, _rec_data, _full_dataset, _train_data, _valid_data, _test_data, base_perts_file, **kwargs):
     """
     Function that starts the perturbation process, that is generates perturbed graphs.
     :param config:
@@ -96,20 +91,19 @@ def perturb(config, model, _rec_data, _full_dataset, _train_data, _valid_data, _
     :param _train_dataset:
     :param _rec_data:
     :param _test_data:
-    :param base_exps_file:
+    :param base_perts_file:
     :param kwargs:
     :return:
     """
     epochs = config['cf_epochs']
-    topk = config['cf_topk']
     wandb_mode = kwargs.get("wandb_mode", "disabled")
     overwrite = kwargs.get("overwrite", False)
 
-    exps_filename = os.path.join(base_exps_file, f"cf_data.pkl")
-    users_order_file = os.path.join(base_exps_file, f"users_order.pkl")
-    model_preds_file = os.path.join(base_exps_file, f"model_rec_test_preds.pkl")
-    checkpoint_path = os.path.join(base_exps_file, "checkpoint.pth")
-    fh = logging.FileHandler(os.path.join(base_exps_file, "perturbation_trainer.log"))
+    perts_filename = os.path.join(base_perts_file, f"cf_data.pkl")
+    users_order_file = os.path.join(base_perts_file, f"users_order.pkl")
+    model_preds_file = os.path.join(base_perts_file, f"model_rec_test_preds.pkl")
+    checkpoint_path = os.path.join(base_perts_file, "checkpoint.pth")
+    fh = logging.FileHandler(os.path.join(base_perts_file, "perturbation_trainer.log"))
     fh.setLevel(logging.DEBUG)
     logging.getLogger().addHandler(fh)
 
@@ -119,7 +113,7 @@ def perturb(config, model, _rec_data, _full_dataset, _train_data, _valid_data, _
     user_source = _rec_data if _rec_data is not None else _test_data
     user_data = user_source.user_df[user_source.uid_field][torch.randperm(user_source.user_df.length)]
 
-    with open(os.path.join(base_exps_file, "config.pkl"), 'wb') as config_file:
+    with open(os.path.join(base_perts_file, "config.pkl"), 'wb') as config_file:
         pickle.dump(config, config_file)
 
     utils.wandb_init(
@@ -127,12 +121,12 @@ def perturb(config, model, _rec_data, _full_dataset, _train_data, _valid_data, _
         **wandb_env_data,
         name="Perturbation",
         job_type="train",
-        group=f"{model.__class__.__name__}_{config['dataset']}_{config['sensitive_attribute'].title()}_epochs{config['cf_epochs']}_exp{os.path.basename(base_exps_file)}",
+        group=f"{model.__class__.__name__}_{config['dataset']}_{config['sensitive_attribute'].title()}_epochs{config['cf_epochs']}_pert{os.path.basename(base_perts_file)}",
         mode=wandb_mode
     )
-    # wandb.config.update({"exp": os.path.basename(base_exps_file)})
+    # wandb.config.update({"pert": os.path.basename(base_perts_file)})
 
-    perturbation_trainer = PerturbationTrainer(
+    perturbation_trainer = BeyondAccuracyPerturbationTrainer(
         config,
         _train_data.dataset,
         _rec_data,
@@ -141,38 +135,37 @@ def perturb(config, model, _rec_data, _full_dataset, _train_data, _valid_data, _
         **kwargs
     )
     perturbation_trainer.set_checkpoint_path(checkpoint_path)
-    logging.getLogger().info("Rec Evaluation data for optimization of PerturbationTrainer")
+    logging.getLogger().info(f"Rec Evaluation data for optimization of {BeyondAccuracyPerturbationTrainer.__name__}")
     logging.getLogger().info(_rec_data.dataset)
 
-    exp, users_order, model_preds = perturbation_trainer.explain(
+    pert, users_order, model_preds = perturbation_trainer.perturb(
         user_data,
         _full_dataset,
         _train_data,
         _valid_data,
         _test_data,
-        epochs,
-        topk=topk
+        epochs
     )
 
-    with open(exps_filename, 'wb') as f:
-        pickle.dump(exp, f)
+    with open(perts_filename, 'wb') as f:
+        pickle.dump(pert, f)
     with open(users_order_file, 'wb') as f:
         pickle.dump(users_order, f)
     with open(model_preds_file, 'wb') as f:
         pickle.dump(model_preds, f)
 
-    logging.getLogger().info(f"Saved perturbations at path {base_exps_file}")
+    logging.getLogger().info(f"Saved perturbations at path {base_perts_file}")
 
 
-def optimize_perturbation(config, model, _train_dataset, _rec_data, _test_data, base_exps_file, **kwargs):
+def optimize_perturbation(config, model, _train_dataset, _rec_data, _test_data, base_perts_file, **kwargs):
     """
-    Function that explains, that is generates perturbed graphs.
+    Function that perturbs, that is generates perturbed graphs.
     :param config:
     :param model:
     :param _train_dataset:
     :param _rec_data:
     :param _test_data:
-    :param base_exps_file:
+    :param base_perts_file:
     :param kwargs:
     :return:
     """
@@ -183,24 +176,24 @@ def optimize_perturbation(config, model, _train_dataset, _rec_data, _test_data, 
     user_source = _rec_data if _rec_data is not None else _test_data
     user_data = user_source.user_df[user_source.uid_field][torch.randperm(user_source.user_df.length)]
 
-    exp_token = f"{model.__class__.__name__}_" + \
-                f"{config['dataset']}_" + \
-                f"{config['sensitive_attribute'].title()}_" + \
-                f"epochs{config['cf_epochs']}_" + \
-                f"exp{os.path.basename(base_exps_file)}"
+    pert_token = f"{model.__class__.__name__}_" + \
+                 f"{config['dataset']}_" + \
+                 f"{config['sensitive_attribute'].title()}_" + \
+                 f"epochs{config['cf_epochs']}_" + \
+                 f"pert{os.path.basename(base_perts_file)}"
 
     def objective(trial):
         wandb_config_keys = [
             'cf_learning_rate',
-            'user_batch_exp',
+            'user_batch_pert',
             'cf_beta',
             'dropout_prob'
         ]
 
         config['cf_learning_rate'] = trial.suggest_int('cf_learning_rate', 1000, 10000)
 
-        config['user_batch_exp'] = trial.suggest_int(
-            'user_batch_exp',
+        config['user_batch_pert'] = trial.suggest_int(
+            'user_batch_pert',
             min(int(_test_data.dataset.user_num * 0.1), 32),
             min(int(_test_data.dataset.user_num * 0.33), 220)
         )
@@ -214,15 +207,15 @@ def optimize_perturbation(config, model, _train_dataset, _rec_data, _test_data, 
         run = utils.wandb_init(
             wandb_config,
             **wandb_env_data,
-            policies=config['explainer_policies'],
-            name=f"Explanation_trial{trial.number}",
+            policies=config['perturbation_policies'],
+            name=f"Perturbation_trial{trial.number}",
             job_type="train",
-            group=exp_token,
+            group=pert_token,
             mode=wandb_mode,
             reinit=True
         )
 
-        perturbation_trainer = PerturbationTrainer(
+        perturbation_trainer = BeyondAccuracyPerturbationTrainer(
             config,
             _train_dataset,
             _rec_data,
@@ -230,22 +223,21 @@ def optimize_perturbation(config, model, _train_dataset, _rec_data, _test_data, 
             dist=config['cf_dist'],
             **kwargs
         )
-        exp, model_preds = perturbation_trainer.explain(
+        pert, model_preds = perturbation_trainer.perturb(
             user_data,
             _test_data,
-            epochs,
-            topk=topk
+            epochs
         )
-        best_exp = utils.get_best_exp_early_stopping(exp, config)
+        best_pert = utils.get_best_pert_early_stopping(pert, config)
 
-        exp_metric = best_exp[utils.exp_col_index('exp_metric')]
+        pert_metric = best_pert[utils.pert_col_index('pert_metric')]
 
         with run:
-            run.log({'trial_exp_metric': exp_metric})
+            run.log({'trial_pert_metric': pert_metric})
 
-        return exp_metric
+        return pert_metric
 
-    study_name = exp_token + '_' + str([k for k in config['explainer_policies'] if config['explainer_policies'][k]])
+    study_name = pert_token + '_' + str([k for k in config['perturbation_policies'] if config['perturbation_policies'][k]])
     storage_name = "sqlite:///{}.db".format(study_name)
     study = optuna.create_study(direction="minimize", study_name=study_name, storage=storage_name, load_if_exists=True)
 
@@ -262,7 +254,7 @@ def optimize_perturbation(config, model, _train_dataset, _rec_data, _test_data, 
         **wandb_env_data,
         name="summary",
         job_type="logging",
-        group=exp_token,
+        group=pert_token,
         mode=wandb_mode
     )
 
@@ -273,45 +265,45 @@ def optimize_perturbation(config, model, _train_dataset, _rec_data, _test_data, 
     # WandB summary.
     for step, trial in enumerate(trials):
         # Logging the loss.
-        summary.log({"trial_exp_metric": trial.value}, step=step)
+        summary.log({"trial_pert_metric": trial.value}, step=step)
 
         # Logging the parameters.
         for k, v in trial.params.items():
             summary.log({k: v}, step=step)
 
-    with open(os.path.join(base_exps_file, 'best_params.json'), 'w') as param_file:
+    with open(os.path.join(base_perts_file, 'best_params.json'), 'w') as param_file:
         json.dump(dict(trial.params.items()), param_file, indent=4)
 
 
-def execute_explanation(pre_config,
-                        model_file,
-                        explainer_config_file=os.path.join("config", "explainer.yaml"),
-                        config_id=-1,
-                        verbose=False,
-                        wandb_mode="disabled",
-                        cmd_config_args=None,
-                        hyperoptimization=False,
-                        overwrite=False):
-    explainer_config = pre_config.update_base_explainer(explainer_config_file)
+def execute_perturbation(pre_config,
+                         model_file,
+                         perturb_config_file=os.path.join("config", "perturbation", "base_perturbation.yaml"),
+                         config_id=-1,
+                         verbose=False,
+                         wandb_mode="disabled",
+                         cmd_config_args=None,
+                         hyperoptimization=False,
+                         overwrite=False):
+    perturbation_config = pre_config.update_base_perturb_data(perturb_config_file)
 
     # load trained model, config, dataset
-    config, model, dataset, train_data, valid_data, test_data = load_data_and_model(
+    config, model, dataset, train_data, valid_data, test_data = utils.load_data_and_model(
         model_file,
-        explainer_config,
+        perturbation_config,
         cmd_config_args=cmd_config_args
     )
 
     # force these evaluation metrics to be ready to be computed
     config['metrics'] = ['ndcg', 'recall', 'hit', 'mrr', 'precision']
 
-    if config['exp_rec_data'] is not None:
-        if config['exp_rec_data'] != 'train+valid':
-            if config['exp_rec_data'] == 'train':
+    if config['pert_rec_data'] is not None:
+        if config['pert_rec_data'] != 'train+valid':
+            if config['pert_rec_data'] == 'train':
                 rec_data = FullSortEvalDataLoader(config, train_data.dataset, train_data.sampler)
-            elif config['exp_rec_data'] == 'rec':  # model recommendations are used as target
+            elif config['pert_rec_data'] == 'rec':  # model recommendations are used as target
                 rec_data = valid_data
             else:
-                rec_data = locals()[f"{config['exp_rec_data']}_data"]
+                rec_data = locals()[f"{config['pert_rec_data']}_data"]
         else:
             valid_train_dataset = train_data.dataset.copy(
                 pd.concat([train_data.dataset.inter_feat, valid_data.dataset.inter_feat], ignore_index=True)
@@ -320,7 +312,7 @@ def execute_explanation(pre_config,
     else:
         rec_data = valid_data
 
-    base_exps_filepath = get_base_exps_filepath(
+    base_perts_filepath = get_base_perts_filepath(
         config,
         config_id=config_id,
         model_name=model.__class__.__name__,
@@ -328,8 +320,8 @@ def execute_explanation(pre_config,
         hyper=hyperoptimization
     )
 
-    if not os.path.exists(base_exps_filepath):
-        os.makedirs(base_exps_filepath)
+    if not os.path.exists(base_perts_filepath):
+        os.makedirs(base_perts_filepath)
 
     global wandb_env_data
     wandb_env_data = {}
@@ -352,7 +344,7 @@ def execute_explanation(pre_config,
             train_data,
             valid_data,
             test_data,
-            base_exps_filepath,
+            base_perts_filepath,
             **kwargs
         )
     else:
@@ -362,6 +354,6 @@ def execute_explanation(pre_config,
             train_data.dataset,
             rec_data,
             test_data,
-            base_exps_filepath,
+            base_perts_filepath,
             **kwargs
         )

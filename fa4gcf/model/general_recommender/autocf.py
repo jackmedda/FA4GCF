@@ -154,12 +154,12 @@ class GTLayer(torch.nn.Module):
         col_embeddings = all_embeddings[cols]
 
         # if torch.cuda.device_count() > 1:
-        # q_embeddings = (row_embeddings @ self.q).view([-1, self.head, self.embedding_size // self.head]).to('cuda:1')
-        # k_embeddings = (col_embeddings @ self.k).view([-1, self.head, self.embedding_size // self.head]).to('cuda:1')
-        # v_embeddings = (col_embeddings @ self.v).view([-1, self.head, self.embedding_size // self.head]).to('cuda:1')
-        q_embeddings = (row_embeddings @ self.q).view([-1, self.head, self.embedding_size // self.head])
-        k_embeddings = (col_embeddings @ self.k).view([-1, self.head, self.embedding_size // self.head])
-        v_embeddings = (col_embeddings @ self.v).view([-1, self.head, self.embedding_size // self.head])
+        q_embeddings = (row_embeddings @ self.q).view([-1, self.head, self.embedding_size // self.head]).to('cuda:1')
+        k_embeddings = (col_embeddings @ self.k).view([-1, self.head, self.embedding_size // self.head]).to('cuda:1')
+        v_embeddings = (col_embeddings @ self.v).view([-1, self.head, self.embedding_size // self.head]).to('cuda:1')
+        # q_embeddings = (row_embeddings @ self.q).view([-1, self.head, self.embedding_size // self.head])
+        # k_embeddings = (col_embeddings @ self.k).view([-1, self.head, self.embedding_size // self.head])
+        # v_embeddings = (col_embeddings @ self.v).view([-1, self.head, self.embedding_size // self.head])
 
         att = torch.einsum('ehd, ehd -> eh', q_embeddings, k_embeddings)
         att = torch.clamp(att, -10.0, 10.0)
@@ -170,13 +170,14 @@ class GTLayer(torch.nn.Module):
         att = exp_att / (att_norm + 1e-8)  # eh
 
         # if torch.cuda.device_count() > 1:
-        # out_embeddings = torch.einsum('eh, ehd -> ehd', att.to('cuda:1'), v_embeddings).view([-1, self.embedding_size])
-        out_embeddings = torch.einsum('eh, ehd -> ehd', att, v_embeddings).view([-1, self.embedding_size])
+        out_embeddings = torch.einsum('eh, ehd -> ehd', att.to('cuda:1'), v_embeddings).view([-1, self.embedding_size])
+        # out_embeddings = torch.einsum('eh, ehd -> ehd', att, v_embeddings).view([-1, self.embedding_size])
+
         tem = torch.zeros([all_embeddings.shape[0], self.embedding_size], dtype=out_embeddings.dtype, device=out_embeddings.device)
 
         # if torch.cuda.device_count() > 1:
-        # out_embeddings = tem.index_add_(0, rows.to('cuda:1'), out_embeddings)  # nd
-        out_embeddings = tem.index_add_(0, rows, out_embeddings)  # nd
+        out_embeddings = tem.index_add_(0, rows.to('cuda:1'), out_embeddings)  # nd
+        # out_embeddings = tem.index_add_(0, rows, out_embeddings)  # nd
 
         return out_embeddings.to(all_embeddings.device)
 

@@ -1,5 +1,4 @@
 import math
-import functools
 from time import time
 
 import torch
@@ -9,7 +8,6 @@ from tqdm import tqdm
 from recbole.trainer import Trainer as RecboleTrainer
 from recbole.utils import early_stopping, dict2str, set_color, get_gpu_usage
 
-from fa4gcf.evaluation import Collector, Evaluator
 from fa4gcf.model.general_recommender.autocf import LocalGraphSampler, SubgraphRandomMasker
 
 

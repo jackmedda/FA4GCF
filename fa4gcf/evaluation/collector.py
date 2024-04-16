@@ -3,8 +3,6 @@ import copy
 import torch
 from recbole.evaluator import Collector as RecboleCollector
 
-from fa4gcf.evaluation.register import Register
-
 
 class Collector(RecboleCollector):
 

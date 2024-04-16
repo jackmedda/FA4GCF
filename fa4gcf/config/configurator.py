@@ -52,23 +52,23 @@ class Config(Recbole_Config):
 
         return final_model, final_model_class, final_dataset
 
-    def update_base_explainer(self, explainer_config_file=None):
+    def update_base_perturb_data(self, perturbation_config_file=None):
         current_file = os.path.dirname(os.path.realpath(__file__))
-        base_explainer_config_file = os.path.join(
-            current_file, os.pardir, os.pardir, "config", "explainer", "base_explainer.yaml"
+        base_perturbation_config_file = os.path.join(
+            current_file, os.pardir, os.pardir, "config", "perturbation", "base_perturbation.yaml"
         )
-        with open(base_explainer_config_file, 'r', encoding='utf-8') as f:
+        with open(base_perturbation_config_file, 'r', encoding='utf-8') as f:
             config_dict = yaml.load(f.read(), Loader=self.yaml_loader)
 
-        if explainer_config_file is not None:
-            if os.path.splitext(explainer_config_file)[-1] == '.yaml':
-                with open(explainer_config_file, 'r', encoding='utf-8') as f:
-                    exp_config_dict = yaml.load(f.read(), Loader=self.yaml_loader)
+        if perturbation_config_file is not None:
+            if os.path.splitext(perturbation_config_file)[-1] == '.yaml':
+                with open(perturbation_config_file, 'r', encoding='utf-8') as f:
+                    pert_config_dict = yaml.load(f.read(), Loader=self.yaml_loader)
             else:
-                with open(explainer_config_file, 'rb') as f:
-                    exp_config_dict = pickle.load(f).final_config_dict
+                with open(perturbation_config_file, 'rb') as f:
+                    pert_config_dict = pickle.load(f).final_config_dict
 
-            config_dict.update(exp_config_dict)
+            config_dict.update(pert_config_dict)
 
         return config_dict
 

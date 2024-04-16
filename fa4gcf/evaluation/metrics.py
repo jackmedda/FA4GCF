@@ -1,8 +1,9 @@
+import torch
 from recbole.evaluator.base_metric import AbstractMetric
 from recbole.evaluator.metrics import NDCG
 from recbole.utils import EvaluatorType
 
-import gnnuers
+from fa4gcf.evaluation.recommender_evaluation import compute_DP
 
 
 class DeltaNDCG(AbstractMetric):
@@ -33,8 +34,12 @@ class DeltaNDCG(AbstractMetric):
         group1_result = result[group_mask1, :].mean(axis=0)
         group2_result = result[group_mask2, :].mean(axis=0)
 
+        if group1_result.shape != group2_result.shape:
+            avg_result = torch.full_like(torch.from_numpy(result), torch.inf)
+        else:
+            avg_result = compute_DP(group1_result, group2_result)
+
         metric_dict = {}
-        avg_result = gnnuers.evaluation.compute_DP(group1_result, group2_result)
         for k in self.ndcg_metric.topk:
             key = "{}@{}".format("deltandcg", k)
             metric_dict[key] = round(avg_result[k - 1], self.decimal_place)

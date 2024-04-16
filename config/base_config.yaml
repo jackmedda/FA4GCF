@@ -27,12 +27,12 @@ eval_args:
 
 data_path: 'dataset'
 require_pow: False              # (bool) Whether or not to perform power operation in EmbLoss.
-enable_amp: False               # (bool) Whether or not to use mixed precision training.
+enable_amp: True                # (bool) Whether or not to use mixed precision training.
 enable_scaler: False            # (bool) Whether or not to use GradScaler in mixed precision training.
 transform: ~                    # (str) The transform operation for batch data process.
 
-checkpoint_dir': 'data/models'
-save_dataset': True
-save_dataloaders': True
+# checkpoint_dir: 'dataset/processed'
+# save_dataset: True
+# save_dataloaders: True
 seed: 42
 load_col: {'inter': ['user_id', 'item_id', 'timestamp']}

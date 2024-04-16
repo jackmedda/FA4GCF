@@ -1,7 +1,6 @@
 import os
 import copy
 import argparse
-import itertools
 
 import torch
 import pandas as pd
@@ -9,7 +8,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 from fa4gcf.config import Config
-from fa4gcf.utils import load_data_and_model
+from FA4GCF.fa4gcf.utils.utils import load_data_and_model
 from fa4gcf.trainer import PerturbationTrainer, PerturbationSampler
 
 
