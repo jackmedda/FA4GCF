@@ -133,16 +133,14 @@ def compute_set_sizes(n_data, splits):
 
 
 def filter_min_interactions(interactions, by='user_id', min_interactions=20):
-    return interactions.filter(pl.all().len().over(by) >= min_interactions)
+    return interactions.filter(pl.all_horizontal(pl.exclude(by).len().over(by) >= min_interactions))
 
 
 def k_core(interactions, user_field='user_id', item_field='item_id', min_interactions=20, iterations=10):
     i = 0
     while True:
         for filter_field, other_field in zip([user_field, item_field], [item_field, user_field]):
-            interactions = interactions.filter(
-                pl.all_horizontal(pl.exclude(other_field).len().over(other_field) >= min_interactions)
-            )
+            interactions = filter_min_interactions(interactions, other_field, min_interactions=min_interactions)
 
         user_check = interactions.groupby(user_field).agg(
             pl.col(item_field).len() >= min_interactions

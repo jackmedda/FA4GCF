@@ -14,6 +14,7 @@ foursquare_tky:
   w2: 1e-7
   w3: 1.0
   w4: 1e-7
+ijcai_15_repeat_buyers_80:
 insurance:
   ILoss_lambda: 1.0
   learning_rate: 2e-4
@@ -29,6 +30,14 @@ lastfm-1k:
   w1: 1.0
   w2: 1.0
   w3: 1e-7
+  w4: 1.0
+lastfm-1m:
+  ILoss_lambda: 1.0
+  learning_rate: 2e-4
+  negative_weight: 10
+  w1: 1.0
+  w2: 1e-7
+  w3: 1.0
   w4: 1.0
 ml-1m:
   ILoss_lambda: 1e-7

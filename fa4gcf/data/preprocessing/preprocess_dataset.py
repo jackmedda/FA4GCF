@@ -57,6 +57,7 @@ if __name__ == "__main__":
     parser.add_argument('--token_fields', nargs='+', help='fields to tokenize')
 
     args = parser.parse_args()
+    args.sep = '\t' if args.sep == '\\t' else args.sep
     if args.train_to_test > 0:
         args.train_split = (args.train_split, args.train_to_test)
 
@@ -104,6 +105,7 @@ if __name__ == "__main__":
         print(df)
         print(df.describe())
         print(df.select(pl.all().n_unique()))
+        exit()
 
     if args.add_token:
         if 'token' not in args.user_field:

@@ -469,7 +469,7 @@ class PerturbationTrainer:
             batch_scores_args = self._get_scores_args(batch_user, self.rec_data)
 
             torch.cuda.empty_cache()
-            new_example, loss_total, pert_loss = self.train(epoch, batch_scores_args, batch_user)
+            new_example, loss_total, pert_loss = self.train(epoch, batch_scores_args)
             epoch_pert_loss.append(pert_loss)
 
             if batch_idx != len(iter_data) - 1:
@@ -532,7 +532,7 @@ class PerturbationTrainer:
 
         return best_cf_example, detached_batched_data, (rec_model_topk, test_model_topk)
 
-    def train(self, epoch, batch_scores_args, batch_user):
+    def train(self, epoch, batch_scores_args):
         raise NotImplementedError()
 
     def log_epoch(self, initial_time, epoch, *losses, **verbose_kws):
@@ -917,7 +917,7 @@ class BeyondAccuracyPerturbationTrainer(PerturbationTrainer):
 
         return best_cf_example, detached_batched_data, (rec_model_topk, test_model_topk)
 
-    def train(self, epoch, scores_args, users_ids):
+    def train(self, epoch, scores_args):
         """
         Training procedure of perturbation
         :param epoch:
@@ -926,7 +926,7 @@ class BeyondAccuracyPerturbationTrainer(PerturbationTrainer):
         train_start = time.time()
         torch.cuda.empty_cache()
 
-        # Only the 500 itmes with the highest predicted relevance will be used to measure the approx NDCG
+        # Only the 500 items with the highest predicted relevance will be used to measure the approx NDCG
         # This prevents the usage of a tremendous amount of memory, due to the pairwise preference function
         MEMORY_PERFORMANCE_MAX_LOSS_TOPK_ITEMS = 500
         if self._pert_loss.ranking_loss_function.__MAX_TOPK_ITEMS__ != MEMORY_PERFORMANCE_MAX_LOSS_TOPK_ITEMS:
@@ -936,7 +936,7 @@ class BeyondAccuracyPerturbationTrainer(PerturbationTrainer):
             self.cf_optimizer.zero_grad()
         self.cf_model.train()
 
-        user_feat = self.get_batch_user_feat(users_ids)
+        user_feat = self.get_batch_user_feat(scores_args[0][0][self.dataset.uid_field])
         target = self.get_target(user_feat)
 
         if self._pert_loss.is_data_feat_needed():
@@ -955,7 +955,6 @@ class BeyondAccuracyPerturbationTrainer(PerturbationTrainer):
         # dot = torchviz.make_dot(loss_total, params=dict(self.cf_model.named_parameters()))
         # dot.graph_attr.update(size='600,600')
         # dot.render("comp_graph", format="png")
-        import pdb; pdb.set_trace()
         loss_total.backward()
 
         # for name, param in self.cf_model.named_parameters():

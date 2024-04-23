@@ -1,0 +1,26 @@
+# learning rate of optimizer for explainer
+cf_learning_rate: 140000 # 3000 (deletion) / 65000 (addition) for NDCGApprox, 300 (deletion) for SigmoidBCELoss
+
+# how many users should be considered to explain?
+user_batch_pert: 32
+# loss weight for the graph dist loss
+cf_beta: 0.5  # 0.01 for NDCGApproxLoss, 4.0 for SigmoidBCELoss
+
+# sensitive attributes to be used in the fairness losses and for following analysis
+sensitive_attribute: gender
+
+load_col:
+    inter: [user_id, item_id, timestamp]
+    user: [user_id, gender, age]
+
+random_perturbation_p: 0.00071
+users_zero_constraint_value: 0
+users_low_degree_ratio: 0.35  # it represent the ratio of the users with the lowest degree
+users_furthest_constraint_ratio: 0.35  # it represent the ratio of the furthest users from the non perturbed group
+users_sparse_constraint_ratio: 0.35  # it represent the ratio of the users most connected with niche items
+items_preference_constraint_ratio: 0.2  # it represent the ratio of items mostly preferred by the perturbed group
+items_niche_constraint_ratio: 0.2  # it represents the ratio of the most niche items
+
+users_interaction_recency_constraint_ratio: 0.35  # it represents the ratio of the users with the most recent interactions
+items_timeless_constraint_ratio: 0.2  # it represents the ratio of the most timeless items
+items_pagerank_constraint_ratio: 0.2  # it represents the ratio of the items with the highest pagerank

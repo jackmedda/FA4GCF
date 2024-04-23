@@ -6,11 +6,16 @@ foursquare_tky:
   activation_function: elu
   learning_rate: 2e-4
   ori_temp: 0.7
+ijcai_15_repeat_buyers_80:
 insurance:
   activation_function: elu
   learning_rate: 2e-4
   ori_temp: 0.7
 lastfm-1k:
+  activation_function: leakyrelu
+  learning_rate: 2e-4
+  ori_temp: 0.7
+lastfm-1m:
   activation_function: leakyrelu
   learning_rate: 2e-4
   ori_temp: 0.7

@@ -1,4 +1,5 @@
 import os
+import re
 import yaml
 import argparse
 import logging
@@ -156,7 +157,7 @@ def recbole_hyper(model, dataset, config_file_list, config_dict, params_file):
             c_dict['parametric'] = base_config['parametric'] if base_config['parametric'] is not None else True
 
         train_result = training(
-            model_name, dataset, c_file_list, c_dict, saved=False, hyper=True
+            base_config['model'], dataset, c_file_list, c_dict, saved=False, hyper=True
         )
         train_result['model'] = model_name
         return train_result
@@ -338,8 +339,14 @@ if __name__ == "__main__":
         else:
             args.config_file_list = [base_overall_config] + args.config_file_list
 
+    # it handles the convention of the min_interactions at the end of the dataset name when a dataset is pre-processed
+    if re.search(r'\d+$', args.dataset) is not None:
+        dataset_name = re.sub(r'\d+$', '', args.dataset)
+    else:
+        dataset_name = args.dataset
+
     all_dataset_configs = os.path.join(current_file, "config", "dataset")
-    dataset_config = os.path.join(all_dataset_configs, f"{args.dataset.lower()}.yaml")
+    dataset_config = os.path.join(all_dataset_configs, f"{dataset_name.lower()}.yaml")
     if os.path.isfile(dataset_config):
         if args.config_file_list is None:
             args.config_file_list = [dataset_config]
@@ -354,7 +361,7 @@ if __name__ == "__main__":
     if args.run == "perturb":
         if args.perturbation_file is None:
             all_perturbation_configs = os.path.join(current_file, "config", "perturbation")
-            perturbation_config = os.path.join(all_perturbation_configs, f"{args.dataset.lower()}_perturbation.yaml")
+            perturbation_config = os.path.join(all_perturbation_configs, f"{dataset_name.lower()}_perturbation.yaml")
 
             if os.path.isfile(perturbation_config):
                 args.perturbation_file = perturbation_config
@@ -363,15 +370,15 @@ if __name__ == "__main__":
             saved_models_path = os.path.join(current_file, "saved")
             maybe_model_file = [
                 f for f in os.listdir(saved_models_path)
-                if args.dataset.lower() in f.lower() and
-                   args.model.lower() in f.lower() and
-                   f.endswith('.pth')
+                if dataset_name.lower() in f.lower()
+                and args.model.lower() in f.lower()
+                and f.endswith('.pth')
             ]
             if len(maybe_model_file) == 1:
                 args.model_file = os.path.join(saved_models_path, maybe_model_file[0])
             else:
                 raise FileNotFoundError(
-                    f'`model_file` is None and no unique {args.model} trained on {args.dataset} found'
+                    f'`model_file` is None and no unique {args.model} trained on {dataset_name} found'
                 )
 
     if args.run == "train":

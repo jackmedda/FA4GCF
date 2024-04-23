@@ -1,0 +1,13 @@
+TIME_FIELD: 'timestamp'
+train_batch_size: 4096
+eval_batch_size: 500000
+# sensitive attributes to be used in the fairness losses and for following analysis
+sensitive_attribute: gender
+
+load_col:
+    inter: [user_id, item_id, timestamp]
+    user: [user_id, gender, age]
+unused_col: {'inter': ['timestamp']}
+
+# NCL
+num_clusters: 115

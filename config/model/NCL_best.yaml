@@ -6,6 +6,7 @@ foursquare_tky:
   alpha: 0.8
   learning_rate: 2e-4
   ssl_reg_weight: 0.05
+ijcai_15_repeat_buyers_80:
 insurance:
   alpha: 0.8
   learning_rate: 2e-4
@@ -14,6 +15,10 @@ lastfm-1k:
   alpha: 1.5
   learning_rate: 2e-4
   ssl_reg_weight: 0.1
+lastfm-1m:
+  alpha: 1.0
+  learning_rate: 1e-4
+  ssl_reg_weight: 0.05
 ml-1m:
   alpha: 0.8
   learning_rate: 2e-4

@@ -22,6 +22,7 @@ foursquare_tky:
     alpha: 1
     beta: 0.01
     k_singular_values: 55
+ijcai_15_repeat_buyers_80:
 insurance:
   True:  # parametric: True
     alpha: 3
@@ -46,6 +47,18 @@ lastfm-1k:
     alpha: 1
     beta: 0.01
     k_singular_values: 55
+lastfm-1m:
+  True: # parametric: True
+    alpha: 6
+    beta: 0.1
+    item_coefficient: 0.5
+    k_singular_values: 90
+    learning_rate: 2e-4
+    user_coefficient: 0.0
+  False: # parametric: True
+    alpha: 6
+    beta: 1.0
+    k_singular_values: 90
 ml-1m:
   True: # parametric: True
     alpha: 3

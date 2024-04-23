@@ -6,11 +6,19 @@ foursquare_tky:
   head: 4
   learning_rate: 2e-4
   ssl_reg_weight: 1
+ijcai_15_repeat_buyers_80:
+  head:
+  learning_rate:
+  ssl_reg_weight:
 insurance:
   head: 2
   learning_rate: 2e-4
   ssl_reg_weight: 1
 lastfm-1k:
+  head: 4
+  learning_rate: 2e-4
+  ssl_reg_weight: 1
+lastfm-1m:
   head: 4
   learning_rate: 2e-4
   ssl_reg_weight: 1

@@ -6,11 +6,16 @@ foursquare_tky:
   learning_rate: 2e-4
   ssl_tau: 0.1
   ssl_weight: 0.01
+ijcai_15_repeat_buyers_80:
 insurance:
   learning_rate: 1e-4
   ssl_tau: 0.1
   ssl_weight: 0.01
 lastfm-1k:
+  learning_rate: 2e-4
+  ssl_tau: 0.1
+  ssl_weight: 0.01
+lastfm-1m:
   learning_rate: 2e-4
   ssl_tau: 0.1
   ssl_weight: 0.01

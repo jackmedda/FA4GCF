@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from torch_geometric.typing import SparseTensor
+from torch_geometric.utils import k_hop_subgraph
 from recbole.model.abstract_recommender import GeneralRecommender as RecboleModel  # to inherit model attributes
 
 import fa4gcf.data.utils as data_utils
@@ -87,7 +88,8 @@ class PygPerturbedModel(RecboleModel):
         # generate discrete P_loss (non-differentiable adj matrix) to compute the graph dist loss
         self.eval()
         with torch.no_grad():
-            cf_adj = self.graph_perturbation_layer(pred=True, return_only_P_loss=True)
+            users_ids = scores_args[0][0][self.USER_ID]
+            cf_adj = self.graph_perturbation_layer(users_ids, pred=True, return_only_P_loss=True)
 
         self.train()
         # Need to change this otherwise loss_graph_dist has no gradient
@@ -124,23 +126,24 @@ class PygPerturbedModel(RecboleModel):
 
         return loss_total, orig_loss_graph_dist, loss_graph_dist, fair_loss, orig_dist
 
-    def forward(self, pred):
+    def forward(self, interaction, pred):
         """
         Perturbs the adjacency matrix in a differentiable way. Then, it re-creates the normalized adjacency matrix,
         and updates it for trained GNN model.
 
+        :param interaction: contains information about the input batch
         :param pred: if True, the perturbation is discrete, i.e., \hat{p} \in \{0, 1\}. Used for inference.
         :return:
         """
-        pert_edge_index, pert_edge_weight = self.graph_perturbation_layer(pred=pred)
+        pert_edge_index, pert_edge_weight = self.graph_perturbation_layer(interaction[self.USER_ID], pred=pred)
         self.perturbation_applier.apply(self.inner_pyg_model, pert_edge_index, pert_edge_weight)
 
     def predict(self, interaction, pred=False):
-        self.forward(pred=pred)
+        self.forward(interaction, pred=pred)
         return self.inner_pyg_model.predict(interaction)
 
     def full_sort_predict(self, interaction, pred=False):
-        self.forward(pred=pred)
+        self.forward(interaction, pred=pred)
         return self.inner_pyg_model.full_sort_predict(interaction)
 
 
@@ -316,7 +319,7 @@ class GraphPerturbation(torch.nn.Module):
             P_symm_nhood_mask = self.mask_neighborhood[filtered_idxs_asymm].to(P_symm.device)
             return torch.where(P_symm_nhood_mask, P_symm, torch.ones_like(P_symm, device=P_symm.device))
 
-    def forward(self, pred=False, return_only_P_loss=False):
+    def forward(self, users_ids, pred=False, return_only_P_loss=False, k_hop=None):
         P_symm = self.P_symm
         # import pdb; pdb.set_trace()
         if not self.edge_additions:
@@ -354,7 +357,27 @@ class GraphPerturbation(torch.nn.Module):
         #     edge_deletions=not self.edge_additions,
         #     mask_filter=self.mask_filter.to(self.P_symm.device) if self.mask_filter is not None else None
         # )
-        pert_edge_index = self.mask_sub_adj if self.edge_additions else self.mask_filter
+
+        if self.edge_additions:
+            pert_edge_index = self.mask_sub_adj
+            if k_hop is not None:
+                if not isinstance(k_hop, int):
+                    raise ValueError("k_hop_subgraph must be an integer to perform the filtering on the perturbation")
+
+                # items_ids are first gathered from hop = 1 and then get the subgraph
+                user_item_subgraph_nodes = k_hop_subgraph(
+                    users_ids, 1, pert_edge_index, relabel_nodes=False, flow="target_to_source"
+                )[0]
+
+                _, _, _, edge_index_mask = k_hop_subgraph(
+                    user_item_subgraph_nodes, k_hop, pert_edge_index, relabel_nodes=False, flow="target_to_source"
+                )
+                pert_edge_index = pert_edge_index[:, edge_index_mask]
+                P_hat_symm = P_hat_symm[edge_index_mask]
+        else:
+            # TODO: check if the k_hop_filtering can be applied also for edge deleting
+            pert_edge_index = self.mask_filter
+
         pert_edge_index, pert_edge_weight = data_utils.create_sparse_symm_matrix_from_vec(
             P_hat_symm,
             pert_edge_index.to(P_hat_symm.device),
