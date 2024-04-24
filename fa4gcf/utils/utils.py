@@ -85,7 +85,7 @@ def load_data_and_model(model_file, perturbation_config=None, cmd_config_args=No
     config['data_path'] = config['data_path'].replace('\\', os.sep)
     # config['device'] = torch.device('cuda')
 
-    logger = getLogger()
+    logger = getLogger('FA4GCF')
     logger.info(config)
 
     if perturbed_dataset is not None:
@@ -174,7 +174,7 @@ def data_preparation(config, dataset):
                 config, dataloaders=(train_data, valid_data, test_data)
             )
 
-    logger = getLogger()
+    logger = getLogger('FA4GCF')
     logger.info(
         set_color("[Training]: ", "pink")
         + set_color("train_batch_size", "cyan")
@@ -335,6 +335,23 @@ def wandb_init(config, policies=None, **kwargs):
         tags=tags,
         config=config
     )
+
+
+def read_recbole_config_skip_errors(filepath, config):
+    with open(filepath, 'r') as yaml_path:
+        def construct_undefined(self, node):
+            if isinstance(node, yaml.nodes.ScalarNode):
+                value = self.construct_scalar(node)
+            elif isinstance(node, yaml.nodes.SequenceNode):
+                value = self.construct_sequence(node)
+            elif isinstance(node, yaml.nodes.MappingNode):
+                value = self.construct_mapping(node)
+            else:
+                assert False, f"unexpected node: {node!r}"
+            return {node.__str__(): value}
+
+        config.yaml_loader.add_constructor(None, construct_undefined)
+        return yaml.load(yaml_path.read(), Loader=config.yaml_loader)
 
 
 def damerau_levenshtein_distance(s1, s2):

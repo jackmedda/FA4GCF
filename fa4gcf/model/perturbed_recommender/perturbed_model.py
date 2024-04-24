@@ -364,16 +364,27 @@ class GraphPerturbation(torch.nn.Module):
                 if not isinstance(k_hop, int):
                     raise ValueError("k_hop_subgraph must be an integer to perform the filtering on the perturbation")
 
-                # items_ids are first gathered from hop = 1 and then get the subgraph
-                user_item_subgraph_nodes = k_hop_subgraph(
+                # items_ids are first gathered from hop = 1
+                ui_subgraph_nodes = k_hop_subgraph(
                     users_ids, 1, pert_edge_index, relabel_nodes=False, flow="target_to_source"
                 )[0]
 
-                _, _, _, edge_index_mask = k_hop_subgraph(
-                    user_item_subgraph_nodes, k_hop, pert_edge_index, relabel_nodes=False, flow="target_to_source"
+                # the subgraph of the input users ids from the original graph must be retrieved to consider also nodes
+                # (of the edges to perturb) that could be reachable in k_hop hops by passing through the original graph
+                if self.edge_weight is None:
+                    edge_index = torch.stack(self.edge_index.coo()[:2])
+                else:
+                    edge_index = self.edge_index
+                subgraph_edge_index = edge_index[:, torch.isin(edge_index[0], users_ids)]
+                pert_subgraph_edge_index = torch.concat((pert_edge_index, subgraph_edge_index), dim=1)
+                _, _, _, pert_subgraph_edge_index_mask = k_hop_subgraph(
+                    ui_subgraph_nodes, k_hop, pert_subgraph_edge_index, relabel_nodes=False, flow="target_to_source"
                 )
-                pert_edge_index = pert_edge_index[:, edge_index_mask]
-                P_hat_symm = P_hat_symm[edge_index_mask]
+
+                # only the mask of the edges to be perturbed should be used for the k_hop filtering
+                pert_edge_index_mask = pert_subgraph_edge_index_mask[:pert_edge_index.shape[1]]
+                pert_edge_index = pert_edge_index[:, pert_edge_index_mask]
+                P_hat_symm = P_hat_symm[pert_edge_index_mask]
         else:
             # TODO: check if the k_hop_filtering can be applied also for edge deleting
             pert_edge_index = self.mask_filter

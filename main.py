@@ -34,7 +34,7 @@ def training(model,
         logging.basicConfig(level=logging.ERROR)
         _config['data_path'] = os.path.join(_config.file_config_dict['data_path'], dataset)
         _config['train_neg_sample_args']['sample_num'] = 1  # hyper-optimization is performed with 1 negative sample
-    logger = logging.getLogger()
+    logger = logging.getLogger('FA4GCF')
 
     use_perturbed_graph = kwargs.get('use_perturbed_graph', False)
     if model_file is not None and not use_perturbed_graph:
@@ -156,9 +156,14 @@ def recbole_hyper(model, dataset, config_file_list, config_dict, params_file):
         if model_name.startswith('svd_gcn'):
             c_dict['parametric'] = base_config['parametric'] if base_config['parametric'] is not None else True
 
-        train_result = training(
-            base_config['model'], dataset, c_file_list, c_dict, saved=False, hyper=True
-        )
+        import traceback
+        try:
+            train_result = training(
+                base_config['model'], dataset, c_file_list, c_dict, saved=False, hyper=True
+            )
+        except Exception as e:
+            print(e)
+            print(traceback.format_exc())
         train_result['model'] = model_name
         return train_result
 
@@ -324,6 +329,8 @@ if __name__ == "__main__":
     unk_args[::2] = map(lambda s: s.replace('-', ''), unk_args[::2])
     unk_args = dict(zip(unk_args[::2], unk_args[1::2]))
 
+    logging.getLogger('FA4GCF').setLevel('DEBUG')
+
     if args.hyper_optimize and not args.verbose:
         from tqdm import tqdm
         from functools import partialmethod
@@ -340,8 +347,8 @@ if __name__ == "__main__":
             args.config_file_list = [base_overall_config] + args.config_file_list
 
     # it handles the convention of the min_interactions at the end of the dataset name when a dataset is pre-processed
-    if re.search(r'\d+$', args.dataset) is not None:
-        dataset_name = re.sub(r'\d+$', '', args.dataset)
+    if re.search(r'_\d+$', args.dataset) is not None:
+        dataset_name = re.sub(r'_\d+$', '', args.dataset)
     else:
         dataset_name = args.dataset
 

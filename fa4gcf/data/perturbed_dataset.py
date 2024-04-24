@@ -8,9 +8,10 @@ import pandas as pd
 from torch_geometric.typing import torch_sparse
 from recbole.utils import FeatureType, FeatureSource, set_color
 
-import fa4gcf.data.utils as utils
+import fa4gcf.data.utils as data_utils
+import fa4gcf.utils as utils
 from fa4gcf.data.dataset import Dataset
-from fa4gcf.data.interaction import Interaction, np_unique_cat_recbole_interaction
+from fa4gcf.data.interaction import np_unique_cat_recbole_interaction
 
 
 class PerturbedDataset(Dataset):
@@ -41,7 +42,7 @@ class PerturbedDataset(Dataset):
         return best_pert
 
     def load_perturbed_edges(self):
-        logger = logging.getLogger()
+        logger = logging.getLogger('FA4GCF')
 
         with open(os.path.join(self.perturbations_path, 'cf_data.pkl'), 'rb') as exp_file:
             exps = pickle.load(exp_file)
@@ -58,7 +59,7 @@ class PerturbedDataset(Dataset):
 
         self.best_perturbation = self.get_best_perturbation(exps, self.pert_config)
 
-        return self.best_perturbation[utils.exp_col_index('del_edges')]
+        return self.best_perturbation[utils.pert_col_index('del_edges')]
 
     def perturb_split(self, split):
         if split in self.SPLITS:
@@ -248,7 +249,7 @@ class PerturbedDataset(Dataset):
 
     @staticmethod
     def edge_index_to_adj_t(edge_index, edge_weight, m_num_nodes, n_num_nodes):
-        return utils.edge_index_to_adj_t(edge_index, edge_weight, m_num_nodes, n_num_nodes)
+        return data_utils.edge_index_to_adj_t(edge_index, edge_weight, m_num_nodes, n_num_nodes)
 
     def get_norm_adj_mat(self, enable_sparse=False):
         r"""Get the normalized interaction matrix of users and items.
@@ -278,7 +279,7 @@ class PerturbedDataset(Dataset):
                     "Dense edge_index will be used instead of SparseTensor in dataset."
                 )
 
-        return utils.get_norm_adj_mat(
+        return data_utils.get_norm_adj_mat(
             edge_index,
             edge_weight,
             num_nodes,

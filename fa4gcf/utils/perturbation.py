@@ -1,3 +1,6 @@
+import numpy as np
+
+
 PERT_END_EPOCHS_STUB = ['STUB', 'STUB']
 
 
@@ -20,7 +23,7 @@ def pert_col_index(col):
 
 
 def get_best_pert_early_stopping(pert_data, config_dict):
-    if pert_data[-1] == _PERT_END_EPOCHS_STUB:
+    if pert_data[-1] == PERT_END_EPOCHS_STUB:
         return pert_data[-2]
 
     best_epoch = get_best_epoch_early_stopping(pert_data, config_dict)
@@ -43,7 +46,7 @@ def get_best_epoch_early_stopping(pert_data, config_dict):
     except TypeError:
         patience = config_dict['earlys_patience']
 
-    if pert_data[-1] == _PERT_END_EPOCHS_STUB:
+    if pert_data[-1] == PERT_END_EPOCHS_STUB:
         return pert_data[-2][pert_col_index('epoch')]
 
     max_epoch = max([e[pert_col_index('epoch')] for e in pert_data])
@@ -52,3 +55,25 @@ def get_best_epoch_early_stopping(pert_data, config_dict):
         return max_epoch
 
     return max_epoch - patience
+
+
+def remap_edges_recbole_ids(dataset, edges, field2id_token=True):
+    mp_edges = []
+    for i, _field in enumerate([dataset.uid_field, dataset.iid_field]):
+        mp_edges.append([])
+        for val in edges[i]:
+            idx_val = val
+
+            if field2id_token:
+                if _field == dataset.iid_field:
+                    idx_val = val - dataset.user_num
+
+                mp_edges[-1].append(dataset.field2id_token[_field][idx_val])
+            else:
+                if _field == dataset.iid_field:
+                    mp_val = dataset.field2token_id[_field][idx_val] + dataset.user_num
+                else:
+                    mp_val = dataset.field2token_id[_field][idx_val]
+
+                mp_edges[-1].append(mp_val)
+    return np.stack(mp_edges)

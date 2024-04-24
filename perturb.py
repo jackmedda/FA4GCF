@@ -103,9 +103,14 @@ def perturb(config, model, _rec_data, _full_dataset, _train_data, _valid_data, _
     users_order_file = os.path.join(base_perts_file, f"users_order.pkl")
     model_preds_file = os.path.join(base_perts_file, f"model_rec_test_preds.pkl")
     checkpoint_path = os.path.join(base_perts_file, "checkpoint.pth")
-    fh = logging.FileHandler(os.path.join(base_perts_file, "perturbation_trainer.log"))
+
+    sh = logging.StreamHandler()
+    fh = logging.FileHandler(os.path.join(base_perts_file, "perturbation_trainer.log"), encoding='utf-8')
+    sh.setLevel(logging.DEBUG)
     fh.setLevel(logging.DEBUG)
-    logging.getLogger().addHandler(fh)
+    logger = logging.getLogger('FA4GCF')
+    logger.addHandler(sh)
+    logger.addHandler(fh)
 
     if overwrite and os.path.exists(checkpoint_path):
         os.remove(checkpoint_path)
@@ -135,8 +140,8 @@ def perturb(config, model, _rec_data, _full_dataset, _train_data, _valid_data, _
         **kwargs
     )
     perturbation_trainer.set_checkpoint_path(checkpoint_path)
-    logging.getLogger().info(f"Rec Evaluation data for optimization of {BeyondAccuracyPerturbationTrainer.__name__}")
-    logging.getLogger().info(_rec_data.dataset)
+    logger.info(f"Rec Evaluation data for optimization of {BeyondAccuracyPerturbationTrainer.__name__}")
+    logger.info(_rec_data.dataset)
 
     pert, users_order, model_preds = perturbation_trainer.perturb(
         user_data,
@@ -154,7 +159,7 @@ def perturb(config, model, _rec_data, _full_dataset, _train_data, _valid_data, _
     with open(model_preds_file, 'wb') as f:
         pickle.dump(model_preds, f)
 
-    logging.getLogger().info(f"Saved perturbations at path {base_perts_file}")
+    logger.info(f"Saved perturbations at path {base_perts_file}")
 
 
 def optimize_perturbation(config, model, _train_dataset, _rec_data, _test_data, base_perts_file, **kwargs):

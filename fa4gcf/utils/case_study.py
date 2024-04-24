@@ -11,7 +11,6 @@ from fa4gcf.data import Dataset
 from fa4gcf.trainer import prepare_batched_data
 from fa4gcf.evaluation import (
     Evaluator,
-    Collector,
     compute_metric,
     get_scores,
     get_top_k

@@ -55,7 +55,7 @@ class PerturbationTrainer:
         self.user_batch_pert = config['user_batch_pert']
         self.unique_graph_dist_loss = config['save_unique_graph_dist_loss']
 
-        self.logger = logging.getLogger()
+        self.logger = logging.getLogger('FA4GCF')
         self.enable_amp = config["enable_amp"]
         self.verbose = kwargs.get("verbose", False)
 
@@ -88,7 +88,7 @@ class PerturbationTrainer:
     @property
     def cf_model(self):
         if self._cf_model is None:
-            print("Counterfactual Model Explainer is not initialized yet. Execute 'explain' to initialize it.")
+            print("Counterfactual Perturbation Model is not initialized yet. Execute 'perturb' to initialize it.")
         else:
             return self._cf_model
 
@@ -182,30 +182,25 @@ class PerturbationTrainer:
             best_epoch = epoch + 1 - self.earlys.patience
             self.logger.info(f"Early Stopping: best epoch {best_epoch}")
 
-            # stub example added to find again the best epoch when explanations are loaded
+            # stub example added to find again the best epoch when perturbations are loaded
             self.update_best_cf_example(*update_best_example_args, force_update=True)
 
             return True
         return False
 
-    def _early_stopping_step(self, pert_losses, epoch_pert_metric, epoch, best_cf_example, *update_best_example_args):
+    def _early_stopping_step(self, pert_losses, epoch_pert_metric, epoch, *update_best_example_args):
         earlys_check_value = {
             'pert_loss': pert_losses[-1],
             'pert_metric': epoch_pert_metric
         }[self.earlys_check_criterion]
         if self._pred_as_rec and earlys_check_value == epoch_pert_metric:
-            raise ValueError(f"`pert_rec_data` = `rec` stores test data to log explanation metric. "
+            raise ValueError(f"`pert_rec_data` = `rec` stores test data to log perturbation metric. "
                              f"Cannot be used as value for early stopping check")
 
         earlys_check = self._check_early_stopping(earlys_check_value, epoch, *update_best_example_args)
         print("*" * 7 + " Early Stopping History " + "*" * 7)
         print(self.earlys.history)
         print("*" * 7 + "************************" + "*" * 7)
-
-        if self.ckpt_loading_path is not None:
-            if not earlys_check:
-                # epoch + 1 because the current one is already finished
-                self._save_checkpoint(epoch + 1, pert_losses, best_cf_example)
 
         return earlys_check
 
@@ -277,7 +272,7 @@ class PerturbationTrainer:
                 user_data,
                 total=len(user_data),
                 ncols=100,
-                desc=set_color(f"Explaining   ", 'pink'),
+                desc=set_color(f"Perturbing   ", 'pink'),
             )
         )
 
@@ -434,12 +429,12 @@ class PerturbationTrainer:
                 update_best_example_args = [best_cf_example, new_example, loss_total, best_loss]
 
                 earlys_check = self._early_stopping_step(
-                    pert_losses, epoch_pert_metric, epoch, best_cf_example, *update_best_example_args
+                    pert_losses, epoch_pert_metric, epoch, *update_best_example_args
                 )
 
                 if earlys_check:
                     break
-                elif epoch == (iter_epochs.iterable - 1):
+                elif epoch == (iter_epochs.total - 1):
                     # stub perturbation that means the code stopped because of the
                     # number of epochs limit, not because of the early stopping
                     update_best_example_args[1] = utils.PERT_END_EPOCHS_STUB
@@ -447,6 +442,9 @@ class PerturbationTrainer:
                     break
 
                 best_loss = self.update_best_cf_example(*update_best_example_args, model_topk=rec_model_topk)
+                if self.ckpt_loading_path is not None:
+                    # epoch + 1 because the current one is already finished
+                    self._save_checkpoint(epoch + 1, pert_losses, best_cf_example)
 
             # the optimizer step of the last epoch_step is done here to prevent computations
             # done to update new example to be related to the new state of the model
@@ -502,7 +500,7 @@ class PerturbationTrainer:
 
         self._initialize_pert_loss()
 
-        # logs of explanation consider validation as seen when model recommendations are used as ground truth
+        # logs of perturbation consider validation as seen when model recommendations are used as ground truth
         if self._pred_as_rec:
             self.rec_data = test_data
 
@@ -539,15 +537,15 @@ class PerturbationTrainer:
         loss_total, pert_loss, loss_graph_dist, orig_loss_graph_dist = losses
         elapsed_time = time.strftime('%H:%M:%S', time.gmtime(time.time() - initial_time))
         self.logger.info(f"{self.cf_model.__class__.__name__} " +
-                         f"Explain duration: {elapsed_time}, " +
+                         f"Perturbation duration: {elapsed_time}, " +
                          # 'User id: {}, '.format(str(users_ids)) +
                          'Epoch: {}, '.format(epoch + 1) +
                          'loss: {:.4f}, '.format(loss_total.item()) +
                          'exp loss: {:.4f}, '.format(pert_loss) +
                          'graph loss: {:.4f}, '.format(loss_graph_dist.item()) +
-                         'perturbed edges: {:.4f}, '.format(int(orig_loss_graph_dist.item())))
+                         'perturbed edges: {:.4f}'.format(int(orig_loss_graph_dist.item())))
         if self.verbose:
-            self.logger.info('Orig output: {}\n'.format(self.model_scores) +
+            self.logger.info(', Orig output: {}\n'.format(self.model_scores) +
                              # 'Output: {}\n'.format(verbose_kws.get('cf_scores', None)) +
                              # 'Output nondiff: {}\n'.format(verbose_kws.get('cf_scores_pred', None)) +
                              '{:20}: {},\n {:20}: {},\n {:20}: {}\n'.format(
@@ -555,7 +553,7 @@ class PerturbationTrainer:
                                  'new pred', verbose_kws.get('cf_topk_idx', None),
                                  'new pred nondiff', verbose_kws.get('cf_topk_pred_idx', None))
                              )
-        self.logger.info(" ")
+            self.logger.info(" ")
 
     @staticmethod
     def _verbose_plot(pert_losses, epoch):
@@ -722,9 +720,9 @@ class BeyondAccuracyPerturbationTrainer(PerturbationTrainer):
         if self._pert_loss.loss_type() == 'Consumer':
             self.logger.info(self.results)
             self.logger.info(f"M idx: {self.m_idx}")
-        self.logger.info(f"Original Rec Explanation Metric Value: {orig_rec_beyondacc_metric_rec}")
+        self.logger.info(f"Original Rec Perturbation Metric Value: {orig_rec_beyondacc_metric_rec}")
         self.logger.info("*********** Test Data ***********")
-        self.logger.info(f"Original Test Explanation Metric Value: {orig_rec_beyondacc_metric_test}")
+        self.logger.info(f"Original Test Perturbation Metric Value: {orig_rec_beyondacc_metric_test}")
 
         full_users_list = full_dataset.user_feat[full_dataset.uid_field][1:].numpy()
         _, full_users_test_model_topk = self._get_model_score_data(full_users_list, test_data)
@@ -883,7 +881,7 @@ class BeyondAccuracyPerturbationTrainer(PerturbationTrainer):
 
         self._initialize_pert_loss()
 
-        # logs of explanation consider validation as seen when model recommendations are used as ground truth
+        # logs of perturbation consider validation as seen when model recommendations are used as ground truth
         if self._pred_as_rec:
             self.rec_data = test_data
 
