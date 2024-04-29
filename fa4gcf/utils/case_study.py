@@ -1,4 +1,5 @@
 import os
+import re
 import yaml
 
 import torch
@@ -55,14 +56,19 @@ def extract_metrics_from_perturbed_edges(exp_info: dict,
             checkpoint = torch.load(model_file)
             config = checkpoint['config']
 
-            exp_dset = dset.replace('-1000', '') if '-1000' in dset else dset
-            explainer_config_file = os.path.join(
-                os.path.dirname(models_path), 'config', 'explainer', f'{exp_dset}_explainer.yaml'
+            pert_dset = re.sub(r'_\d+$', '', dset)
+            if os.path.exists(os.path.join(os.path.dirname(models_path), 'config', 'perturbation')):
+                pert_config_key = 'perturbation'
+            else:
+                pert_config_key = 'explainer'
+            perturbation_config_file = os.path.join(
+                os.path.dirname(models_path), 'config', pert_config_key, f'{pert_dset}_{pert_config_key}.yaml'
             )
-            with open(explainer_config_file, 'r', encoding='utf-8') as f:
-                exp_file_content = f.read()
-                explain_config_dict = yaml.load(exp_file_content, Loader=config.yaml_loader)
-            config.final_config_dict.update(explain_config_dict)
+            # with open(perturbation_config_file, 'r', encoding='utf-8') as f:
+            #     pert_file_content = f.read()
+            #     perturbation_config_dict = yaml.load(pert_file_content, Loader=config.yaml_loader)
+            perturbation_config_dict = config.update_base_perturb_data(perturbation_config_file)
+            config.final_config_dict.update(perturbation_config_dict)
 
             config['data_path'] = config['data_path'].replace('\\', os.sep)
             if mod == "SVD_GCN":

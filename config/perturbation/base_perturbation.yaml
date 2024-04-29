@@ -1,5 +1,3 @@
-enable_amp: True
-
 unused_col: {}  # ensures all columns are taken (useful for the timestamp information during the perturbation)
 
 # optimizer for perturbation_trainer ['SGD', 'AdamW', 'Adadelta']

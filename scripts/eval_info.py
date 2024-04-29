@@ -12,16 +12,15 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from recbole.evaluator import Evaluator
 
-import gnnuers
-
 current_file = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(current_file, os.pardir))
 
 import fa4gcf.utils as utils
+import fa4gcf.evaluation as evaluation
 from fa4gcf.config import Config
-from fa4gcf.evaluation import (
+from fa4gcf.utils.case_study import (
     pref_data_from_checkpoint,
-    extract_metrics_from_perturbed_edges,
+    extract_metrics_from_perturbed_edges
 )
 
 
@@ -52,7 +51,8 @@ if __name__ == "__main__":
     if args.exp_path[-1] != os.sep:
         args.exp_path += os.sep
 
-    _, dset, mod, _, _, s_attr, eps, cid, _ = args.exp_path.split('dp_explanations')[1].split(os.sep)
+    path_split_key = 'dp_perturbations' if 'dp_perturbations' in args.exp_path else 'dp_explanations'
+    _, dset, mod, _, _, s_attr, eps, cid, _ = args.exp_path.split(path_split_key)[1].split(os.sep)
     eps = eps.replace('epochs_', '')
 
     model_files = os.scandir(os.path.join(os.path.dirname(sys.path[0]), 'saved'))
@@ -61,13 +61,13 @@ if __name__ == "__main__":
     config = Config(
         model=mod,
         dataset=dset,
-        config_file_list=[os.path.join(current_file, '..', 'config', 'explainer', 'base_explainer.yaml')],
+        config_file_list=[os.path.join(current_file, '..', 'config', 'perturbation', 'base_perturbation.yaml')],
         config_dict={"gpu_id": args.gpu_id}
     )
-    explainer_config = config.update_base_explainer(os.path.join(current_file, '..', args.exp_path, 'config.pkl'))
+    perturbation_config = config.update_base_perturb_data(os.path.join(current_file, '..', args.exp_path, 'config.pkl'))
     config, model, dataset, train_data, valid_data, test_data = utils.load_data_and_model(
         model_file,
-        explainer_config
+        perturbation_config
     )
 
     # Users policies
@@ -101,7 +101,8 @@ if __name__ == "__main__":
         'items_pagerank_constraint': pagerankitems_pol
     }
 
-    raw_exp_policies = [k for k, v in config['explainer_policies'].items() if v and k in policy_map]
+    pol_key = 'perturbation_policies' if 'perturbation_policies' in config else 'explainer_policies'
+    raw_exp_policies = [k for k, v in config[pol_key].items() if v and k in policy_map]
     exp_policies = [policy_map[k] for k in raw_exp_policies]
     curr_policy = '+'.join(exp_policies)
 
@@ -129,15 +130,15 @@ if __name__ == "__main__":
         ]
         _pref_data["Demo Group"] = _pref_data["Demo Group"].map(consumer_group_map[s_attr.lower()]).to_numpy()
 
-        metric_result = gnnuers.evaluation.compute_metric(evaluator, _eval_data, _pref_data, 'cf_topk_pred', 'ndcg')
+        metric_result = evaluation.compute_metric(evaluator, _eval_data, _pref_data, 'cf_topk_pred', 'ndcg')
         _pref_data['Value'] = metric_result[:, -1]
         _pref_data['Quantile'] = _pref_data['Value'].map(lambda x: np.ceil(x * 10) / 10 if x > 0 else 0.1)
 
     batch_exp = config['user_batch_exp']
-    exps, rec_model_preds, test_model_preds = gnnuers.utils.load_dp_exps_file(args.exp_path)
-    best_exp = gnnuers.utils.get_best_exp_early_stopping(exps[0], config)
+    exps, rec_model_preds, test_model_preds = utils.load_dp_perturbations_file(args.exp_path)
+    best_exp = utils.get_best_pert_early_stopping(exps[0], config)
 
-    pert_edges = best_exp[gnnuers.utils.exp_col_index('del_edges')]
+    pert_edges = best_exp[utils.pert_col_index('del_edges')]
 
     _, valid_pert_df, test_pert_df = extract_metrics_from_perturbed_edges(
         {(dset, s_attr): pert_edges},
@@ -175,14 +176,14 @@ if __name__ == "__main__":
         total = orig_dp_df['Value'].mean()
         metr_dg1 = orig_dp_df.loc[orig_dp_df['Demo Group'] == dgs[0], 'Value'].to_numpy()
         metr_dg2 = orig_dp_df.loc[orig_dp_df['Demo Group'] == dgs[1], 'Value'].to_numpy()
-        _dp = gnnuers.evaluation.compute_DP(metr_dg1.mean(), metr_dg2.mean())
+        _dp = evaluation.compute_DP(metr_dg1.mean(), metr_dg2.mean())
         pval = scipy.stats.mannwhitneyu(metr_dg1, metr_dg2).pvalue
         plot_df_data.append([_dp, split, 'Orig', metr_dg1.mean(), metr_dg2.mean(), total, pval])
 
         total = pert_dp_df['Value'].mean()
         metr_dg1 = pert_dp_df.loc[pert_dp_df['Demo Group'] == dgs[0], 'Value'].to_numpy()
         metr_dg2 = pert_dp_df.loc[pert_dp_df['Demo Group'] == dgs[1], 'Value'].to_numpy()
-        _dp = gnnuers.evaluation.compute_DP(metr_dg1.mean(), metr_dg2.mean())
+        _dp = evaluation.compute_DP(metr_dg1.mean(), metr_dg2.mean())
 
         pval = scipy.stats.mannwhitneyu(metr_dg1, metr_dg2).pvalue
         plot_df_data.append([_dp, split, curr_policy, metr_dg1.mean(), metr_dg2.mean(), total, pval])

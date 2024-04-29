@@ -9,8 +9,9 @@ from recbole.evaluator.collector import DataStruct
 def get_scores(model, batched_data, tot_item_num, item_tensor, **kwargs):
     interaction, history_index, _, _ = batched_data
     inter_data = interaction.to(model.device)
-    if kwargs['pred'] is None:
-        kwargs.pop('pred')
+    if 'pred' in kwargs:
+        if kwargs['pred'] is None:
+            kwargs.pop('pred')
     full_sort_predict = False
     try:
         scores = model.full_sort_predict(inter_data, **kwargs)

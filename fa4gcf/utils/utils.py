@@ -28,7 +28,7 @@ from fa4gcf.data import Dataset
 from fa4gcf.data.custom_dataloader import *
 
 
-def load_data_and_model(model_file, perturbation_config=None, cmd_config_args=None, perturbed_dataset=None):
+def load_data_and_model(model_file, perturbation_config_file=None, cmd_config_args=None, perturbed_dataset=None):
     r"""Load filtered dataset, split dataloaders and saved model.
     Args:
         model_file (str): The path of saved model file.
@@ -44,16 +44,17 @@ def load_data_and_model(model_file, perturbation_config=None, cmd_config_args=No
     checkpoint = torch.load(model_file)
     config = checkpoint['config']
 
-    if perturbation_config is not None:
-        if isinstance(perturbation_config, str):
-            with open(perturbation_config, 'r', encoding='utf-8') as f:
-                explain_config_dict = yaml.load(f.read(), Loader=config.yaml_loader)
-        elif isinstance(perturbation_config, dict):
-            explain_config_dict = perturbation_config
+    if perturbation_config_file is not None:
+        if isinstance(perturbation_config_file, str):
+            perturbation_config_dict = config.update_base_perturb_data(perturbation_config_file)
+        elif isinstance(perturbation_config_file, dict):
+            perturbation_config_dict = perturbation_config_file
         else:
-            raise ValueError(f'explainer_config cannot be `{type(perturbation_config)}`. Only `str` and `dict` are supported')
+            raise ValueError(
+                f'perturbation_config cannot be `{type(perturbation_config_file)}`. Only `str` and `dict` are supported'
+            )
 
-        config.final_config_dict.update(explain_config_dict)
+        config.final_config_dict.update(perturbation_config_dict)
 
     if cmd_config_args is not None:
         for arg, val in cmd_config_args.items():
@@ -80,10 +81,9 @@ def load_data_and_model(model_file, perturbation_config=None, cmd_config_args=No
                         new_val = arg_type(val)  # cast to same type in config
                     conf[arg] = new_val
                 except (ValueError, TypeError):
-                    warnings.warn(f"arg [{arg}] taken from cmd not valid for explainer config file")
+                    warnings.warn(f"arg [{arg}] taken from cmd not valid for perturbation config file")
 
     config['data_path'] = config['data_path'].replace('\\', os.sep)
-    # config['device'] = torch.device('cuda')
 
     logger = getLogger('FA4GCF')
     logger.info(config)
@@ -325,7 +325,7 @@ def wandb_init(config, policies=None, **kwargs):
     config = config.final_config_dict if not isinstance(config, dict) else config
 
     tags = None
-    policies = config.get("explainer_policies", policies)
+    policies = config.get("perturbation_policies", policies) or config.get("explainer_policies", policies)
     if policies is not None:
         tags = [k for k in policies if policies[k]]
     config['wandb_tags'] = tags

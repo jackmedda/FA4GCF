@@ -21,7 +21,7 @@ item_policy_order = ['IP', 'IT', 'PR']
 datasets = [
     "rent_the_runway",
     "foursquare_nyc",
-    "lastfm-1k",
+    "lastfm-1m",
     "foursquare_tky",
     "ml-1m",
 ]
@@ -36,7 +36,7 @@ models = [
 
 dataset_map = {
         'rent_the_runway': 'RENT',
-        'lastfm-1k': 'LF1K',
+        'lastfm-1m': 'LF1M',
         'foursquare_nyc': 'FNYC',
         'foursquare_tky': 'FTKY',
         'ml-1m': 'ML1M'

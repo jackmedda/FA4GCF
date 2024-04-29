@@ -227,8 +227,7 @@ def main(run,
     elif run == 'perturb':
         torch.use_deterministic_algorithms(True)
         model_file = kwargs.get('model_file')
-        config = Config(model=model, dataset=dataset, config_file_list=config_file_list, config_dict=config_dict)
-        return execute_perturbation(config, model_file, *perturb_args)
+        return execute_perturbation(model_file, *perturb_args)
     elif run == 'recbole_hyper':
         return recbole_hyper(model, dataset, config_file_list, config_dict, hyper_params_file)
 
@@ -322,12 +321,16 @@ if __name__ == "__main__":
 
     args, parsed_unk_args = parser.parse_known_args()
     print(args)
-    print("Unknown args", parsed_unk_args)
     conf_dict = {}
+
+    # workaround for NumPy deprecation error in Recbole code
+    import numpy as np
+    np.float = float
 
     unk_args = parsed_unk_args[:]
     unk_args[::2] = map(lambda s: s.replace('-', ''), unk_args[::2])
     unk_args = dict(zip(unk_args[::2], unk_args[1::2]))
+    print("Unknown args", unk_args)
 
     logging.getLogger('FA4GCF').setLevel('DEBUG')
 

@@ -131,6 +131,7 @@ def perturb(config, model, _rec_data, _full_dataset, _train_data, _valid_data, _
     )
     # wandb.config.update({"pert": os.path.basename(base_perts_file)})
 
+    logger.info(config)
     perturbation_trainer = BeyondAccuracyPerturbationTrainer(
         config,
         _train_data.dataset,
@@ -280,8 +281,7 @@ def optimize_perturbation(config, model, _train_dataset, _rec_data, _test_data, 
         json.dump(dict(trial.params.items()), param_file, indent=4)
 
 
-def execute_perturbation(pre_config,
-                         model_file,
+def execute_perturbation(model_file,
                          perturb_config_file=os.path.join("config", "perturbation", "base_perturbation.yaml"),
                          config_id=-1,
                          verbose=False,
@@ -289,12 +289,10 @@ def execute_perturbation(pre_config,
                          cmd_config_args=None,
                          hyperoptimization=False,
                          overwrite=False):
-    perturbation_config = pre_config.update_base_perturb_data(perturb_config_file)
-
     # load trained model, config, dataset
     config, model, dataset, train_data, valid_data, test_data = utils.load_data_and_model(
         model_file,
-        perturbation_config,
+        perturb_config_file,
         cmd_config_args=cmd_config_args
     )
 

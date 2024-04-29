@@ -1,3 +1,6 @@
+import  os
+import pickle
+
 import numpy as np
 
 
@@ -20,6 +23,18 @@ def pert_col_index(col):
     except ValueError:
         idx = col
     return idx
+
+
+def load_dp_perturbations_file(base_pert_file):
+    cf_data_file = os.path.join(base_pert_file, 'cf_data.pkl')
+    model_preds_file = os.path.join(base_pert_file, 'model_rec_test_preds.pkl')
+
+    with open(cf_data_file, 'rb') as file:
+        exps = [pickle.load(file)]
+    with open(model_preds_file, 'rb') as file:
+        model_preds = pickle.load(file)
+
+    return exps, *model_preds
 
 
 def get_best_pert_early_stopping(pert_data, config_dict):
