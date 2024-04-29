@@ -37,33 +37,6 @@ def perturbation_sampler_kwargs_gen(conf):
         new_conf[conf_pol_key]['group_deletion_constraint'] = True
         new_conf[conf_pol_key][pol] = True
 
-        # group_deletion_constraint = new_conf['explainer_policies']['group_deletion_constraint']
-        # users_zero_constraint = new_conf['explainer_policies']['users_zero_constraint']
-        # users_zero_constraint_value = new_conf['users_zero_constraint_value']
-        # items_preference_constraint = new_conf['explainer_policies']['items_preference_constraint']
-        # items_preference_constraint_ratio = new_conf['items_preference_constraint_ratio']
-        # users_furthest_constraint = new_conf['explainer_policies']['users_furthest_constraint']
-        # users_furthest_constraint_ratio = new_conf['users_furthest_constraint_ratio']
-        # interaction_recency_constraint = new_conf['explainer_policies']['users_interaction_recency_constraint']
-        # interaction_recency_constraint_ratio = new_conf['users_interaction_recency_constraint_ratio']
-        # items_timeless_constraint = new_conf['explainer_policies']['items_timeless_constraint']
-        # items_timeless_constraint_ratio = new_conf['items_timeless_constraint_ratio']
-        # items_pagerank_constraint = new_conf['explainer_policies']['items_pagerank_constraint']
-        # items_pagerank_constraint_ratio = new_conf['items_pagerank_constraint_ratio']
-        #
-        # kwargs = dict(
-        #     group_deletion=group_deletion_constraint,
-        #     users_zero_th=users_zero_constraint_value if users_zero_constraint else None,
-        #     users_sparse_ratio=0,
-        #     users_furthest_ratio=users_furthest_constraint_ratio if users_furthest_constraint else 0,
-        #     users_low_degree_ratio=0,
-        #     items_preference_ratio=items_preference_constraint_ratio if items_preference_constraint else 0,
-        #     items_niche_ratio=0,
-        #     users_interaction_recency_ratio=interaction_recency_constraint_ratio if interaction_recency_constraint else 0,
-        #     items_timeless_ratio=items_timeless_constraint_ratio if items_timeless_constraint else 0,
-        #     items_pagerank_ratio=items_pagerank_constraint_ratio if items_pagerank_constraint else 0
-        # )
-
         yield pol, new_conf
 
 
