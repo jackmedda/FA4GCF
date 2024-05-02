@@ -10,7 +10,6 @@ Reference code:
 """
 
 import torch
-import scipy
 import numpy as np
 
 from recbole.utils import InputType, ModelType
@@ -75,6 +74,9 @@ class SVD_GCN(GeneralGraphRecommender):
         # define layers and loss
         self.mf_loss = BPRLoss()
         self.W = self._init_params()
+
+        # torch.svd_lowrank is not deterministic, so user and item vectors are saved to improve replicability
+        self.other_parameter_name = ['user_vector', 'item_vector']
 
     def _init_params(self):
         if self.parametric:

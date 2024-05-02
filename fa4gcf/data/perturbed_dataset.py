@@ -15,7 +15,7 @@ from fa4gcf.data.interaction import np_unique_cat_recbole_interaction
 
 
 class PerturbedDataset(Dataset):
-    FEATS = [FeatureSource.INTERACTION, FeatureSource.ITEM]  # our method never deletes users
+    FEATS = [FeatureSource.INTERACTION, FeatureSource.ITEM]  # the perturbed dataset never deletes users
 
     def __init__(self, config, perturbations_path, best_pert):
         self.perturbations_path = perturbations_path
@@ -37,16 +37,16 @@ class PerturbedDataset(Dataset):
         elif self.best_pert[0] == "fixed_pert":
             best_pert = utils.get_pert_by_epoch(perts, self.best_pert[1])
         else:
-            raise ValueError("`best_pert` must be set to select the explanation of a specific epoch")
+            raise ValueError("`best_pert` must be set to select the perturbation of a specific epoch")
 
         return best_pert
 
     def load_perturbed_edges(self):
         logger = logging.getLogger('FA4GCF')
 
-        with open(os.path.join(self.perturbations_path, 'cf_data.pkl'), 'rb') as exp_file:
-            exps = pickle.load(exp_file)
-        logger.info(f"Original Fair Loss: {exps[0][-1]}")
+        with open(os.path.join(self.perturbations_path, 'cf_data.pkl'), 'rb') as perts_file:
+            perts = pickle.load(perts_file)
+        logger.info(f"Original Fair Loss: {perts[0][-1]}")
 
         self.pert_config = utils.read_recbole_config_skip_errors(
             os.path.join(self.perturbations_path, 'config.yaml'),
@@ -54,10 +54,10 @@ class PerturbedDataset(Dataset):
         )
         logger.info(self.pert_config)
 
-        if self.pert_config['exp_rec_data'] != 'valid':
-            logger.warning('Performing Graph Augmentation on Explanations NOT produced on Validation Data.')
+        if self.pert_config['pert_rec_data'] != 'valid':
+            logger.warning('Performing Graph Augmentation on Perturbation NOT produced on Validation Data.')
 
-        self.best_perturbation = self.get_best_perturbation(exps, self.pert_config)
+        self.best_perturbation = self.get_best_perturbation(perts, self.pert_config)
 
         return self.best_perturbation[utils.pert_col_index('del_edges')]
 
@@ -107,13 +107,8 @@ class PerturbedDataset(Dataset):
 
     def perturb_feat(self, source=FeatureSource.INTERACTION):
         if source in self.FEATS:
-            feat_file = os.path.join(self.config['data_path'], f"{self.config['dataset']}.{source.value}")
-            if not os.path.isfile(feat_file):
-                return None  # it could be triggered if the dataset does not have item features (i.e. ".item" file)
-
-            # new dataset is the merge of splits => it takes care of particular cases, like an edge in the validation
-            # set that was added to the training set (it should then not be considered as deleted, and it should be in
-            # the final dataset
+            # new dataset is the merge of splits => it takes care of particular cases. For instance, an edge in the
+            # validation set that was added to the training set is removed from the validation set and kept in training
             pert_splits = [self.perturb_split(split) for split in self.SPLITS]
             merged_splits = pert_splits[0]
             for p_split in pert_splits[1:]:
@@ -226,13 +221,13 @@ class PerturbedDataset(Dataset):
             self.logger.warning(f'No columns has been loaded from [{source}]')
             return None
 
-        df: pd.DataFrame = self.perturb_feat(source)
-        if df is None or source not in self.FEATS:
+        if source in self.FEATS:
+            df: pd.DataFrame = self.perturb_feat(source)
+        else:
             df = pd.read_csv(
                 filepath, delimiter=field_separator, usecols=usecols, dtype=dtype, encoding=encoding, engine='python'
             )
             df.columns = columns
-            df = df.astype(dtype)
 
         seq_separator = self.config['seq_separator']
         for field in columns:

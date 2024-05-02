@@ -36,11 +36,11 @@ def training(model,
         _config['train_neg_sample_args']['sample_num'] = 1  # hyper-optimization is performed with 1 negative sample
     logger = logging.getLogger('FA4GCF')
 
-    use_perturbed_graph = kwargs.get('use_perturbed_graph', False)
+    use_perturbed_graph = kwargs.get('perturbations_path', None) is not None
     if model_file is not None and not use_perturbed_graph:
         loaded_config, _model, _dataset, train_data, valid_data, test_data = utils.load_data_and_model(
             model_file,
-            perturbation_config=_config.final_config_dict,  # not used for perturbation, but to update params
+            perturbation_config_file=_config.final_config_dict,  # not used for perturbation, but to update params
             perturbed_dataset=False
         )
         loaded_config.final_config_dict.update(_config.final_config_dict)
@@ -93,6 +93,8 @@ def training(model,
         trainer.saved_model_file = perturbed_model_path
         if resume_perturbed_training:
             trainer.resume_checkpoint(perturbed_model_path)
+
+        logger.info(f"Model trained with perturbed graph will be saved in perturbations path {args.perturbations_path}")
     elif model_file is not None:
         trainer.resume_checkpoint(model_file)
     else:
@@ -164,6 +166,8 @@ def recbole_hyper(model, dataset, config_file_list, config_dict, params_file):
         except Exception as e:
             print(e)
             print(traceback.format_exc())
+            raise e
+
         train_result['model'] = model_name
         return train_result
 
@@ -223,7 +227,7 @@ def main(run,
     """
 
     if run == 'train':
-        return training(model, dataset, config_file_list, config_dict, queue=queue)
+        return training(model, dataset, config_file_list, config_dict, queue=queue, **kwargs)
     elif run == 'perturb':
         torch.use_deterministic_algorithms(True)
         model_file = kwargs.get('model_file')
@@ -306,17 +310,16 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=str, default="5678", help="the port of master node")
     parser.add_argument("--world_size", type=int, default=-1, help="total number of jobs")
     parser.add_argument("--group_offset", type=int, default=0, help="the global rank offset of this group")
-    perturb_group.add_argument('--perturbation_file', default=None)
+    perturb_group.add_argument('--perturbation_config_file', default=None, help="path to config in perturbations")
     perturb_group.add_argument('--perturbation_id', default=-1)
     perturb_group.add_argument('--verbose', action='store_true')
     perturb_group.add_argument('--wandb_online', action='store_true')
     perturb_group.add_argument('--hyper_optimize', action='store_true')
     perturb_group.add_argument('--overwrite', action='store_true')
-    perturbed_train_group.add_argument('--use_perturbed_graph', action='store_true')
-    perturbed_train_group.add_argument('--best_pert', nargs="*",
+    perturbed_train_group.add_argument('--perturbations_path', default=None)
+    perturbed_train_group.add_argument('--best_perturbation', nargs="*",
                                        help="one of ['fairest', 'fairest_before_pert', 'fixed_pert'] with "
                                             "the chosen pert number for the last two types")
-    perturbed_train_group.add_argument('--perturbations_path', default=None)
     recbole_hyper_group.add_argument('--params_file', default=None)
 
     args, parsed_unk_args = parser.parse_known_args()
@@ -369,19 +372,18 @@ if __name__ == "__main__":
         args.config_file_list.append(model_config)
 
     if args.run == "perturb":
-        if args.perturbation_file is None:
+        if args.perturbation_config_file is None:
             all_perturbation_configs = os.path.join(current_file, "config", "perturbation")
             perturbation_config = os.path.join(all_perturbation_configs, f"{dataset_name.lower()}_perturbation.yaml")
 
             if os.path.isfile(perturbation_config):
-                args.perturbation_file = perturbation_config
+                args.perturbation_config_file = perturbation_config
 
         if args.model_file is None:
             saved_models_path = os.path.join(current_file, "saved")
             maybe_model_file = [
                 f for f in os.listdir(saved_models_path)
-                if dataset_name.lower() in f.lower()
-                and args.model.lower() in f.lower()
+                if f"{args.model}-{dataset_name}".lower() in f.lower()
                 and f.endswith('.pth')
             ]
             if len(maybe_model_file) == 1:
@@ -417,14 +419,26 @@ if __name__ == "__main__":
                     best_conf_dict = best_conf_dict[args.dataset.lower()]
                 conf_dict.update(best_conf_dict)
 
-        if args.use_perturbed_graph:
-            if args.perturbation_file:
-                # TODO: check that the path has the experiments folder setup
-                pass
+        if args.perturbations_path is not None:
+            perturb_exps_path_dirs = args.perturbations_path.split(os.sep)
+            if perturb_exps_path_dirs[-1] == os.sep:
+                perturb_exps_path_dirs = perturb_exps_path_dirs[:-1]
+
+            if not (
+                perturb_exps_path_dirs[-1].isdigit()
+                and perturb_exps_path_dirs[-2].startswith('epochs')
+                and perturb_exps_path_dirs[-5].endswith('Trainer')
+                and perturb_exps_path_dirs[-7] == args.dataset
+                and perturb_exps_path_dirs[-9] == 'experiments'
+            ):
+                raise FileNotFoundError(
+                    'train with perturbed graph requires that --perturbations_path is the path of the perturbations '
+                    'folder with cf_data.pkl obtained after running --run perturb'
+                )
 
     args.wandb_online = {False: "offline", True: "online"}[args.wandb_online]
     perturb_args = [
-        args.perturbation_file,
+        args.perturbation_config_file,
         args.perturbation_id,
         args.verbose,
         args.wandb_online,
@@ -441,5 +455,5 @@ if __name__ == "__main__":
         hyper_params_file=args.params_file,
         model_file=args.model_file,
         perturbations_path=args.perturbations_path,
-        best_perturbation=args.best_pert
+        best_perturbation=args.best_perturbation
     )

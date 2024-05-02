@@ -46,6 +46,7 @@ class SVD_GCNTrainer(TraditionalTrainer):
             self.epochs = config['epochs']  # overwrites the single epoch with the value in config
         else:
             self.eval_step = 1  # the model is also evaluated on the validation set
+            self.saved_model_file = self.saved_model_file.replace('SVD_GCN', 'SVD_GCN_S')
 
 
 class GFCFTrainer(TraditionalTrainer):

@@ -88,11 +88,46 @@ if __name__ == "__main__":
     item_policies = ['IP', 'IT', 'PR']
     user_item_policies = [f"{up}+{ip}" for up in user_policies for ip in item_policies]
 
-    dataset_order = ['RENT', 'LF1K', 'FNYC', 'FTKY', 'ML1M']
+    # dataset_order = ['RENT', 'LF1K', 'FNYC', 'FTKY', 'ML1M']
+    dataset_order = ['RENT', 'LF1M', 'FNYC', 'FTKY', 'ML1M']
     models_order = ['AutoCF', 'DirectAU', 'HMLET', 'LightGCN', 'NCL', 'NGCF', 'SGL', 'SVD-GCN', 'XSimGCL']
     policies_order = ['Orig'] + user_policies + item_policies + user_item_policies
     group_attr_order = ['Age', 'Gender']
     pert_type_order = ['Orig', 'Pert']
+
+    dataset_map = {
+        'rent_the_runway': 'RENT',
+        # 'lastfm-1k': 'LF1K',
+        'lastfm-1m': 'LF1M',
+        'foursquare_nyc': 'FNYC',
+        'foursquare_tky': 'FTKY',
+        'ml-1m': 'ML1M'
+    }
+
+    # model_map = {
+    #     'GCMC': 'GCMC',
+    #     'LightGCN': 'LGCN',
+    #     'NGCF': 'NGCF'
+    # }
+
+    setting_map = {
+        'consumer | ndcg': 'CP',
+        'consumer | softmax': 'CS',
+        'provider | exposure': 'PE',
+        'provider | visibility': 'PV'
+    }
+
+    pert_type_map = {
+        'Orig | deletion': 'Orig',
+        'Orig | addition': 'Orig',
+        'Perturbed | deletion': '$\dotplus$ Del',
+        'Perturbed | addition': '$\dotplus$ Add'
+    }
+
+    group_attr_map = {
+        'gender': 'Gender',
+        'age': 'Age'
+    }
 
     loaded_dfs = []
     group_dfs = []
@@ -135,7 +170,7 @@ if __name__ == "__main__":
     for dirpath, dirnames, filenames in os.walk(all_dsets_path):
         if filenames:
             for x in filenames:
-                if x == 'orig_pert_pval_dict.pkl':
+                if x == 'orig_pert_pval_dict.pkl' and any(x in dirpath for x in dataset_map.keys()):
                     metadata = dirpath.split(all_dsets_path + os.sep)[1]
                     dset, mod, s_attr, conf_pol = metadata.split(os.sep)
                     conf_id, policy = conf_pol.split('_')
@@ -147,39 +182,6 @@ if __name__ == "__main__":
                                 orig_pert_pval_data.append(
                                     [dset, mod, s_attr, policy, spl, metr, pval_value]
                                 )
-
-    dataset_map = {
-        'rent_the_runway': 'RENT',
-        'lastfm-1k': 'LF1K',
-        'foursquare_nyc': 'FNYC',
-        'foursquare_tky': 'FTKY',
-        'ml-1m': 'ML1M'
-    }
-
-    # model_map = {
-    #     'GCMC': 'GCMC',
-    #     'LightGCN': 'LGCN',
-    #     'NGCF': 'NGCF'
-    # }
-
-    setting_map = {
-        'consumer | ndcg': 'CP',
-        'consumer | softmax': 'CS',
-        'provider | exposure': 'PE',
-        'provider | visibility': 'PV'
-    }
-
-    pert_type_map = {
-        'Orig | deletion': 'Orig',
-        'Orig | addition': 'Orig',
-        'Perturbed | deletion': '$\dotplus$ Del',
-        'Perturbed | addition': '$\dotplus$ Add'
-    }
-
-    group_attr_map = {
-        'gender': 'Gender',
-        'age': 'Age'
-    }
 
     orig_pert_pval_df = pd.DataFrame(orig_pert_pval_data, columns=orig_pert_pval_cols)
 
@@ -203,10 +205,11 @@ if __name__ == "__main__":
     for dirpath, _, merged_csvs in os.walk(os.path.dirname(out_path)):
         if merged_csvs and '.ipynb_checkpoints' not in dirpath:
             for mc in merged_csvs:
-                if mc == 'best_exp_raw_perc_values_table.csv':
+                if mc == 'best_exp_raw_perc_values_table.csv' and any(x in dirpath for x in dataset_map.keys()):
                     first_merged_dfs_to_merge.append(pd.read_csv(os.path.join(dirpath, mc)))
 
     first_total_df = pd.concat(first_merged_dfs_to_merge, axis=0, ignore_index=True)
+    first_total_df["Model"] = first_total_df["Model"].replace('SVD_GCN', 'SVD-GCN')
     first_total_df.to_csv(os.path.join(os.path.dirname(out_path), 'total_raw_perc_table.csv'), index=False)
 
     if args.psi_impact:
@@ -231,7 +234,6 @@ if __name__ == "__main__":
         for i, (fixed_psi_df, varying_psi_type) in enumerate(
                 zip([fixed_item_psi, fixed_user_psi], ['$\Psi_{\mathcal{U}}$', '$\Psi_{\mathcal{I}}$'])
         ):
-            fig, axs = plt.subplots(len(fixed_psi_df['Dataset'].unique()), 1, figsize=(10, 8))  # , sharex='col')
             fixed_psi_df[varying_psi_type] = fixed_psi_df['Policy'].map(
                 lambda p: p.split('(')[1].replace(')', '').split('+')[i]
             ).astype(float)
@@ -249,68 +251,58 @@ if __name__ == "__main__":
                 markersize=30
             )
 
-            psi_dsets_order = ['LF1K', 'ML1M']
+            # psi_dsets_order = ['LF1K', 'ML1M']
+            psi_dsets_order = ['LF1M', 'ML1M']
 
-            fixed_psi_df_gby = fixed_psi_df.groupby('Dataset')
-            for dset_i, psi_dset in enumerate(psi_dsets_order):
-                dset_psi_df = fixed_psi_df_gby.get_group(psi_dset)
+            fixed_psi_df_gby = fixed_psi_df.groupby(['Policy', 'Dataset', 'Model', 'GroupAttribute'])
+            for dset_i, ((psi_pol, psi_dset, psi_mod, psi_grattr), setting_psi_df) in enumerate(fixed_psi_df_gby):
+                psi_out_path = os.path.join(
+                    os.path.dirname(out_path), 'varying_psi', psi_dset, psi_mod, psi_grattr, psi_pol
+                )
+                os.makedirs(psi_out_path, exist_ok=True)
+
+                fig, ax = plt.subplots(1, 1, figsize=(10, 4))
                 colors = sns.color_palette('cividis', n_colors=4)
                 ax_color, axx_color = colors[0], colors[-2]
-                axs[dset_i].margins(y=0.1)
+                ax.margins(y=0.1)
                 sns.lineplot(
-                    x=varying_psi_type, y='Value', data=dset_psi_df[dset_psi_df['Metric'] == dp_key],
-                    color=ax_color, ax=axs[dset_i], **style_kws
+                    x=varying_psi_type, y='Value', data=setting_psi_df[setting_psi_df['Metric'] == dp_key],
+                    color=ax_color, ax=ax, **style_kws
                 )
-                axs[dset_i].set_xlabel('')
-                # axs[dset_i].set_ylabel(f'{dset_psi_df["Setting"].iloc[0]}\n{dp_key}', color=ax_color)
-                axs[dset_i].set_ylabel(dp_key, color=ax_color)
-                axs[dset_i].tick_params(axis='y', labelcolor=ax_color)
+                ax.set_xlabel('')
+                # ax.set_ylabel(f'{dset_psi_df["Setting"].iloc[0]}\n{dp_key}', color=ax_color)
+                ax.set_ylabel(dp_key, color=ax_color)
+                ax.tick_params(axis='y', labelcolor=ax_color)
 
-                axx = axs[dset_i].twinx()
+                axx = ax.twinx()
                 axx.margins(y=0.1)
                 sns.lineplot(
-                    x=varying_psi_type, y='Value', data=dset_psi_df[dset_psi_df['Metric'] == 'NDCG'],
+                    x=varying_psi_type, y='Value', data=setting_psi_df[setting_psi_df['Metric'] == 'NDCG'],
                     color=axx_color, ax=axx, **style_kws
                 )
                 axx.set_xlabel('')
                 axx.set_ylabel('NDCG', color=axx_color)
                 axx.tick_params(axis='y', labelcolor=axx_color)
 
-                axs[dset_i].grid(axis='both', which='major', ls=':', color='k')
-                axs[dset_i].set_xticks(fixed_psi_df[varying_psi_type].unique())
-                axs[dset_i].xaxis.set_major_formatter(mpl_tickers.FuncFormatter(lambda x, pos: f"{int(x * 100)}%"))
-                axs[dset_i].yaxis.set_major_formatter(mpl_tickers.StrMethodFormatter("{x:.2f}"))
+                ax.grid(axis='both', which='major', ls=':', color='k')
+                ax.set_xticks(fixed_psi_df[varying_psi_type].unique())
+                ax.xaxis.set_major_formatter(mpl_tickers.FuncFormatter(lambda x, pos: f"{int(x * 100)}%"))
+                ax.yaxis.set_major_formatter(mpl_tickers.StrMethodFormatter("{x:.2f}"))
                 axx.yaxis.set_major_formatter(mpl_tickers.StrMethodFormatter("{x:.2f}"))
-                axs[dset_i].yaxis.set_major_locator(mpl_tickers.LinearLocator(6))
+                ax.yaxis.set_major_locator(mpl_tickers.LinearLocator(6))
                 axx.yaxis.set_major_locator(mpl_tickers.LinearLocator(6))
 
-                ax_handles, ax_labels = axs[dset_i].get_legend_handles_labels()
+                ax_handles, ax_labels = ax.get_legend_handles_labels()
                 axx_handles, axx_labels = axx.get_legend_handles_labels()
                 handles, labels = ax_handles + axx_handles, ax_labels + axx_labels
-                axs[dset_i].get_legend().remove()
+                ax.get_legend().remove()
                 axx.get_legend().remove()
 
-            fig.subplots_adjust(hspace=0.5)
-            for dset_i, dset in enumerate(psi_dsets_order):
-                extent = axs[dset_i].get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-
-                # bbox_args = [1.7, 1.1] if i == 0 else [1.1, 1.1]
-                width = extent.width
-                height = extent.height
-                deltaw = (1.45 * width - width) / 2.0
-                deltah = (1.36 * height - height) / 2.0  # (1.115 * height - height) / 2.0 if dset_i == 0 else (1.315 * height - height) / 2.0
-                offsetw = -0.05 if dset_i == 0 or i == 0 else -0.14
-                offseth = -0.660  # -0.101 if dset_i == 0 else -0.660
-                a = np.array([[-deltaw - deltaw * offsetw, -deltah], [deltaw, deltah + deltah * offseth]])
-                new_bbox = extent._points + a
                 fig.savefig(
-                    os.path.join(
-                        os.path.dirname(out_path),
-                        dset + ('_user_' if i == 0 else '_item_') + 'varying_psi_lineplot.png'
-                    ),
-                    bbox_inches=mpl_trans.Bbox(new_bbox), dpi=300
+                    os.path.join(psi_out_path, ('user' if i == 0 else 'item') + '_varying_psi_lineplot.png'),
+                    bbox_inches='tight', pad_inches=0, dpi=300
                 )
-            plt.close(fig)
+                plt.close(fig)
 
         figlegend = plt.figure(figsize=(len(labels),  1))
         figlegend.legend(
@@ -354,13 +346,11 @@ if __name__ == "__main__":
 
     before_key, after_key = "Base", "Aug"
     first_best_pol_orig_df = pd.concat([test_best_first_total_df, test_orig_first_total_df], axis=0, ignore_index=True)
-    first_best_pol_orig_df["Model"] = first_best_pol_orig_df["Model"].replace('SVD_GCN', 'SVD-GCN')
     first_best_pol_orig_df["Metric"] = first_best_pol_orig_df["Metric"].replace('DP', '$\Delta$')
     first_best_pol_orig_df["Status"] = first_best_pol_orig_df["Policy"].map(lambda p: before_key if p == "Orig" else after_key)
     first_best_pol_orig_df["GroupAttribute"] = first_best_pol_orig_df["GroupAttribute"].map({"Gender": "G", "Age": "A"})
 
     test_orig_pert_pval_df = orig_pert_pval_df[orig_pert_pval_df["Split"] == "Test"]
-    test_orig_pert_pval_df["Model"] = test_orig_pert_pval_df["Model"].replace('SVD_GCN', 'SVD-GCN')
     test_orig_pert_pval_df["Metric"] = test_orig_pert_pval_df["Metric"].replace('DP', '$\Delta$')
     test_orig_pert_pval_df["GroupAttribute"] = test_orig_pert_pval_df["GroupAttribute"].map({"Gender": "G", "Age": "A"})
 
@@ -421,6 +411,7 @@ if __name__ == "__main__":
     first_best_pol_orig_df_pivot.columns.names = [""] * len(first_best_pol_orig_df_pivot.columns.names)
 
     pval_idx_columns = ["Dataset", "GroupAttribute", "Model", "Metric", "Policy"]
+    test_orig_pert_pval_df["Model"] = test_orig_pert_pval_df["Model"].replace('SVD_GCN', 'SVD-GCN')
     test_orig_pert_pval_df_idx = test_orig_pert_pval_df.set_index(pval_idx_columns)
     for _, row in first_best_pol_orig_df_pivot.iterrows():
         row_idx = row.name

@@ -1,6 +1,5 @@
 import os
 import sys
-import yaml
 import pickle
 import argparse
 
@@ -96,7 +95,7 @@ if __name__ == "__main__":
         'users_zero_constraint': zerousers_pol,
         'users_furthest_constraint': furthestusers_pol,
         'items_preference_constraint': itemspref_pol,
-        'interaction_recency_constraint': interrecency_pol,
+        'users_interaction_recency_constraint': interrecency_pol,
         'items_timeless_constraint': timelessitems_pol,
         'items_pagerank_constraint': pagerankitems_pol
     }
