@@ -185,7 +185,8 @@ def pref_data_from_checkpoint_and_perturbed_edges(config,
 
     model = utils.get_model(config['model'])(config, train_dataset).to(config['device'])
     model.load_state_dict(checkpoint['state_dict'])
-    model.load_other_parameter(checkpoint.get('other_parameter'))
+    if not config['model'].lower().startswith('svd_gcn'):
+        model.load_other_parameter(checkpoint.get('other_parameter'))
     if hasattr(model, "restore_item_e"):
         model.restore_item_e = None
         model.restore_user_e = None

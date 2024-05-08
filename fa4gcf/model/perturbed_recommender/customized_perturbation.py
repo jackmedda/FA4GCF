@@ -34,9 +34,9 @@ class PerturbationApplier:
 
         return self._model2applier[applier_key]
 
-    def apply(self, model, edge_index, edge_weight):
+    def apply(self, model, edge_index, edge_weight, **kwargs):
         applier = self.get_applier(model)
-        applier(model, edge_index, edge_weight)
+        applier(model, edge_index, edge_weight, **kwargs)
 
         if hasattr(model, "restore_user_e") and hasattr(model, "restore_item_e"):
             model.restore_user_e, model.restore_item_e = None, None
@@ -50,7 +50,7 @@ class PerturbationApplier:
         model.edge_weight = edge_weight
 
     @staticmethod
-    def _apply_svd_gcn(model, edge_index, edge_weight):
+    def _apply_svd_gcn(model, edge_index, edge_weight, weak_determinism=True):
         if isinstance(edge_index, SparseTensor):
             row, col, edge_weight = edge_index.coo()
             edge_index = torch.stack((row, col))
@@ -66,12 +66,16 @@ class PerturbationApplier:
             device=model.device
         )
         model.rate_matrix = rate_matrix
-        U, value, V = model.get_svd(model.q)
 
-        weighted_value = model._apply_value_weight(value)
+        # User and item vectors should be updated, but the results are unexpected
+        # due to the non-deterministic behavior of torch.svd_lowrank
+        if weak_determinism:
+            U, value, V = model.get_svd(model.q)
 
-        model.user_vector = U * weighted_value
-        model.item_vector = V * weighted_value
+            weighted_value = model._apply_value_weight(value)
+
+            model.user_vector = U * weighted_value
+            model.item_vector = V * weighted_value
 
     @staticmethod
     def _apply_direct_au(model, edge_index, edge_weight):

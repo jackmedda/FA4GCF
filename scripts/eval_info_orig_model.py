@@ -7,18 +7,13 @@ import torch
 import numpy as np
 import pandas as pd
 
-import fa4gcf.evaluaion as eval_utils
-
 current_file = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(current_file, os.pardir))
 
 import fa4gcf.utils as utils
+import fa4gcf.evaluation as evaluation
 from fa4gcf.config import Config
-from fa4gcf.evaluation import (
-    Evaluator,
-    pref_data_from_checkpoint,
-    extract_metrics_from_perturbed_edges,
-)
+from fa4gcf.utils.case_study import pref_data_from_checkpoint
 
 
 if __name__ == "__main__":
@@ -68,14 +63,14 @@ if __name__ == "__main__":
 
     demo_group_map = dataset.field2id_token[s_attr]
 
-    evaluator = Evaluator(config)
+    evaluator = evaluation.Evaluator(config)
     for _pref_data, _eval_data in zip([orig_test_pref_data, orig_valid_pref_data], [test_data.dataset, valid_data.dataset]):
         _pref_data['Demo Group'] = [
             demo_group_map[dg] for dg in dataset.user_feat[s_attr][_pref_data['user_id']].numpy()
         ]
         _pref_data["Demo Group"] = _pref_data["Demo Group"].map(consumer_group_map[s_attr.lower()]).to_numpy()
 
-        metric_result = eval_utils.compute_metric(evaluator, _eval_data, _pref_data, 'cf_topk_pred', 'ndcg')
+        metric_result = evaluation.compute_metric(evaluator, _eval_data, _pref_data, 'cf_topk_pred', 'ndcg')
         _pref_data['Value'] = metric_result[:, -1]
         _pref_data['Quantile'] = _pref_data['Value'].map(lambda x: np.ceil(x * 10) / 10 if x > 0 else 0.1)
 
@@ -88,7 +83,7 @@ if __name__ == "__main__":
         total = orig_dp_df['Value'].mean()
         metr_dg1 = orig_dp_df.loc[orig_dp_df['Demo Group'] == dgs[0], 'Value'].to_numpy()
         metr_dg2 = orig_dp_df.loc[orig_dp_df['Demo Group'] == dgs[1], 'Value'].to_numpy()
-        _dp = eval_utils.compute_DP(metr_dg1.mean(), metr_dg2.mean())
+        _dp = evaluation.compute_DP(metr_dg1.mean(), metr_dg2.mean())
         pval = scipy.stats.mannwhitneyu(metr_dg1, metr_dg2).pvalue
         plot_df_data.append([_dp, split, 'Orig', metr_dg1.mean(), metr_dg2.mean(), total, pval])
 

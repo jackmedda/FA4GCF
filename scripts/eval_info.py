@@ -9,7 +9,6 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from recbole.evaluator import Evaluator
 
 current_file = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(current_file, os.pardir))
@@ -21,7 +20,6 @@ from fa4gcf.utils.case_study import (
     pref_data_from_checkpoint,
     extract_metrics_from_perturbed_edges
 )
-
 
 if __name__ == "__main__":
     """It works only when called from outside of the scripts folder as a script (not as a module)."""
@@ -55,7 +53,8 @@ if __name__ == "__main__":
     eps = eps.replace('epochs_', '')
 
     model_files = os.scandir(os.path.join(os.path.dirname(sys.path[0]), 'saved'))
-    model_file = [f.path for f in model_files if mod in f.name and dset.upper() in f.name][0]
+    model_file = [f.path for f in model_files if f"{mod}-{dset.upper()}" in f.name][0]
+    print("Model file:", model_file)
 
     config = Config(
         model=mod,
@@ -122,7 +121,7 @@ if __name__ == "__main__":
 
     demo_group_map = dataset.field2id_token[s_attr]
 
-    evaluator = Evaluator(config)
+    evaluator = evaluation.Evaluator(config)
     for _pref_data, _eval_data in zip([orig_test_pref_data, orig_valid_pref_data], [test_data.dataset, valid_data.dataset]):
         _pref_data['Demo Group'] = [
             demo_group_map[dg] for dg in dataset.user_feat[s_attr][_pref_data['user_id']].numpy()

@@ -228,8 +228,8 @@ if __name__ == "__main__":
         first_total_df = first_total_df[first_total_df['Split'] == 'Test'].reset_index(drop=True)
         dp_key = '$\Delta$'
         first_total_df = first_total_df.replace('DP', dp_key)
-        fixed_user_psi = first_total_df[first_total_df['Policy'].str.contains('0.35+', regex=False)]
-        fixed_item_psi = first_total_df[first_total_df['Policy'].str.contains('+0.2', regex=False)]
+        fixed_user_psi = first_total_df[first_total_df['Policy'].str.contains('(0.35+', regex=False)]
+        fixed_item_psi = first_total_df[first_total_df['Policy'].str.contains('+0.2)', regex=False)]
 
         for i, (fixed_psi_df, varying_psi_type) in enumerate(
                 zip([fixed_item_psi, fixed_user_psi], ['$\Psi_{\mathcal{U}}$', '$\Psi_{\mathcal{I}}$'])
@@ -425,21 +425,23 @@ if __name__ == "__main__":
                 first_best_pol_orig_df_pivot.loc[row_idx, col_idx] = pval_str + row_col_val
 
     with open(os.path.join(os.path.dirname(out_path), "best_policy_compare_orig_dp_utility.tex"), "w") as tex_file:
-        tex_file.write(
-            first_best_pol_orig_df_pivot.to_latex(
-                column_format=">{\\raggedright}p{7.5mm}>{\\raggedright}p{1mm}l*{9}{|>{\\raggedright}p{2.5mm}rr}",
-                multicolumn=True,
-                multicolumn_format="c|",
-                multirow=True,
-                escape=False
-            ).replace(
-                "NDCG", r"NDCG $\uparrow$"
-            ).replace(
-                "$\Delta$", "$\Delta$ $\downarrow_0$"
-            ).replace(
-                "\multirow[t]", "\multirow[c]"
-            )
+        best_policy_tex_text = first_best_pol_orig_df_pivot.to_latex(
+            column_format=">{\\raggedright}p{7.5mm}>{\\raggedright}p{1mm}l*{9}{|>{\\raggedright}p{2.5mm}rr}",
+            multicolumn=True,
+            multicolumn_format="c|",
+            multirow=True,
+            escape=False
+        ).replace(
+            "NDCG", r"NDCG $\uparrow$"
+        ).replace(
+            "$\Delta$", "$\Delta$ $\downarrow_0$"
+        ).replace(
+            "\multirow[t]", "\multirow[c]"
         )
+        for dset in dataset_map.values():
+            best_policy_tex_text = best_policy_tex_text.replace(dset, '\\rotatebox[origin=c]{90}{' + dset + '}')
+
+        tex_file.write(best_policy_tex_text)
 
     # Mini Heatmaps
     heatmaps_path = os.path.join(os.path.dirname(out_path), 'mini_heatmaps')

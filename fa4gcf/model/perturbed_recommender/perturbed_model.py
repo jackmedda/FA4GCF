@@ -69,6 +69,9 @@ class PygPerturbedModel(RecboleModel):
             gcn_norm_kwargs=gcn_norm_kwargs
         )
         self.perturbation_applier = PerturbationApplier()
+        self.applier_kwargs = {
+            'weak_determinism': config['svd_gcn_weak_determinism']
+        }
 
     def cf_state_dict(self):
         return self.graph_perturbation_layer.cf_state_dict()
@@ -136,7 +139,7 @@ class PygPerturbedModel(RecboleModel):
         :return:
         """
         pert_edge_index, pert_edge_weight = self.graph_perturbation_layer(interaction[self.USER_ID], pred=pred)
-        self.perturbation_applier.apply(self.inner_pyg_model, pert_edge_index, pert_edge_weight)
+        self.perturbation_applier.apply(self.inner_pyg_model, pert_edge_index, pert_edge_weight, **self.applier_kwargs)
 
     def predict(self, interaction, pred=False):
         self.forward(interaction, pred=pred)

@@ -54,7 +54,8 @@ class PerturbedDataset(Dataset):
         )
         logger.info(self.pert_config)
 
-        if self.pert_config['pert_rec_data'] != 'valid':
+        pert_rec_data_key = 'pert_rec_data' if 'pert_rec_data' in self.pert_config else 'exp_rec_data'
+        if self.pert_config[pert_rec_data_key] != 'valid':
             logger.warning('Performing Graph Augmentation on Perturbation NOT produced on Validation Data.')
 
         self.best_perturbation = self.get_best_perturbation(perts, self.pert_config)

@@ -37,7 +37,14 @@ def training(model,
     logger = logging.getLogger('FA4GCF')
 
     use_perturbed_graph = kwargs.get('perturbations_path', None) is not None
-    if model_file is not None and not use_perturbed_graph:
+    if use_perturbed_graph and model_file is not None:
+        logger.warning(
+            'Training with perturbed graph is automatically resumed. '
+            'Model file should not be passed => Setting model_file to None'
+        )
+        model_file = None
+
+    if model_file is not None:
         loaded_config, _model, _dataset, train_data, valid_data, test_data = utils.load_data_and_model(
             model_file,
             perturbation_config_file=_config.final_config_dict,  # not used for perturbation, but to update params
