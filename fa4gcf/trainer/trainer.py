@@ -17,9 +17,7 @@ class Trainer(RecboleTrainer):
         super(Trainer, self).__init__(config, model)
 
     @torch.no_grad()
-    def evaluate(
-            self, eval_data, load_best_model=True, model_file=None, show_progress=False
-    ):
+    def evaluate(self, eval_data, load_best_model=True, model_file=None, show_progress=False):
         # Add user sensitive attribute information to the evaluation collector
         if eval_data:
             self.eval_collector.eval_data_collect(eval_data)
@@ -36,6 +34,7 @@ class TraditionalTrainer(Trainer):
     def __init__(self, config, model):
         super(TraditionalTrainer, self).__init__(config, model)
         self.epochs = 1
+        self.eval_step = 1  # the model is also evaluated on the validation set
 
 
 class SVD_GCNTrainer(TraditionalTrainer):
@@ -45,7 +44,6 @@ class SVD_GCNTrainer(TraditionalTrainer):
         if config['parametric']:
             self.epochs = config['epochs']  # overwrites the single epoch with the value in config
         else:
-            self.eval_step = 1  # the model is also evaluated on the validation set
             self.saved_model_file = self.saved_model_file.replace('SVD_GCN', 'SVD_GCN_S')
 
 

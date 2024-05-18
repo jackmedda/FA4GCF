@@ -9,7 +9,10 @@ import wandb
 import numba
 from recbole.sampler import KGSampler
 from recbole.data.dataloader import *
-from recbole.trainer import Trainer as RecboleTrainer
+from recbole.trainer import (
+    Trainer as RecboleTrainer,
+    TraditionalTrainer as RecboleTraditionalTrainer
+)
 from recbole.utils import (
     ModelType,
     set_color,
@@ -311,9 +314,12 @@ def get_trainer(model_type, model_name):
             )
         else:
             loaded_recbole_trainer = get_recbole_trainer(model_type, model_name)
-            if loaded_recbole_trainer is RecboleTrainer:  # only if the Recbole Trainer is the one for General models
+            if loaded_recbole_trainer is RecboleTrainer:
                 return getattr(importlib.import_module("fa4gcf.trainer"), "Trainer")
+            elif loaded_recbole_trainer is RecboleTraditionalTrainer:
+                return getattr(importlib.import_module("fa4gcf.trainer"), "TraditionalTrainer")
             else:
+                # Other Trainer types (KG, context-aware) are not supported in FA4GCF
                 warnings.warn(
                     f"[{model_name}] uses a Trainer not supported in FA4GCF. Successful execution not guaranteed.",
                     RuntimeWarning

@@ -52,6 +52,8 @@ sensitive_attribute: gender
 
 #
 item_discriminative_attribute: visibility
+short_head_item_discriminative_ratio: 0.2
+item_discriminative_map: ['[PAD]', SH, LT]  # SH: Short Head, LT: Long Tail
 
 # if True each new exp will have a different number of edges from the last one
 save_unique_graph_dist_loss: True

@@ -161,18 +161,22 @@ class PerturbationTrainer:
             raise AttributeError("A checkpoint of a completed run cannot be resumed")
 
         best_cf_example = ckpt['best_cf_example']
-        self.cf_model.load_cf_state_dict(ckpt)
+        self.cf_model.load_cf_state_dict(ckpt['cf_model_state_dict'])
+        self.cf_optimizer.load_state_dict(ckpt['cf_optimizer_state_dict'])
 
         return pert_losses, epoch, best_cf_example
 
     def _save_checkpoint(self, epoch, pert_losses, best_cf_example):
-        cf_state_dict = self.cf_model.cf_state_dict()
+        cf_model_state_dict = self.cf_model.cf_state_dict()
+        cf_optimizer_state_dict = self.cf_optimizer.state_dict()
         ckpt = {
             'starting_epoch': epoch,
             'pert_losses': pert_losses,
             'early_stopping': self.earlys,
             'best_cf_example': best_cf_example,
-            **cf_state_dict
+            'cf_model_state_dict': cf_model_state_dict,
+            'cf_optimizer_state_dict': cf_optimizer_state_dict
+
         }
         torch.save(ckpt, self.ckpt_loading_path)
 
@@ -613,7 +617,7 @@ class BeyondAccuracyPerturbationTrainer(PerturbationTrainer):
         # SH / LT Explainable Fairness in Recommendation
         self.item_discriminative_ratio = config['short_head_item_discriminative_ratio'] or 0.2
         self.item_discriminative_groups_distrib = [1, 1 / self.item_discriminative_ratio - 1]
-        self.item_discriminative_map = ['[PAD]', 'SH', 'LT']  # SH: Short Head, LT: Long Tail
+        self.item_discriminative_map = config['item_discriminative_map']
 
         # User Coverage
         self.coverage_min_relevant_items = config['coverage_min_relevant_items'] or 0

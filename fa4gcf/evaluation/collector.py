@@ -3,6 +3,8 @@ import copy
 import torch
 from recbole.evaluator import Collector as RecboleCollector
 
+from fa4gcf.data.utils import update_item_feat_discriminative_attribute
+
 
 class Collector(RecboleCollector):
 
@@ -14,6 +16,17 @@ class Collector(RecboleCollector):
             if not hasattr(eval_data.dataset, "user_feat"):
                 raise AttributeError("Evaluation data does not include user features.")
             self.data_struct.set("eval_data.user_feat", eval_data.dataset.user_feat)
+
+        if self.register.need("eval_data.item_discriminative_feat"):
+            temp_dataset = copy.deepcopy(eval_data.dataset)
+            update_item_feat_discriminative_attribute(
+                temp_dataset,
+                self.config['item_discriminative_attribute'],
+                self.config['short_head_item_discriminative_ratio'],
+                self.config['item_discriminative_map']
+            )
+            self.data_struct.set("eval_data.item_discriminative_feat", copy.deepcopy(temp_dataset.item_feat))
+            del temp_dataset
 
     def eval_batch_collect(
         self,
@@ -38,7 +51,15 @@ class Collector(RecboleCollector):
         And reset some of outdated resource.
         """
         returned_struct = copy.deepcopy(self.data_struct)
-        for key in ["rec.users", "rec.topk", "rec.meanrank", "rec.score", "rec.items", "data.label"]:
+        register_keys = [
+            "rec.users",
+            "rec.topk",
+            "rec.meanrank",
+            "rec.score",
+            "rec.items",
+            "data.label"
+        ]
+        for key in register_keys:
             if key in self.data_struct:
                 del self.data_struct[key]
         return returned_struct

@@ -204,7 +204,7 @@ def compute_provider_raw_metric(pref_data, dataset, provider_metric, group, topk
         exposure_discount = np.log2(np.arange(1, k + 1) + 1)
 
         # metric = ((metric / exposure_discount).sum(dim=1) / (1 / exposure_discount).sum()).mean()
-        metric = torch.from_numpy(_compute_raw_exposure(topk_recs.numpy(), mask.numpy(), exposure_discount))
+        metric = torch.from_numpy(compute_raw_exposure(topk_recs.numpy(), mask.numpy(), exposure_discount))
     else:
         raise NotImplementedError(f'The provider metric `{provider_metric}` is not supported')
 
@@ -212,7 +212,7 @@ def compute_provider_raw_metric(pref_data, dataset, provider_metric, group, topk
 
 
 @numba.jit(nopython=True, parallel=True)
-def _compute_raw_exposure(topk_recs, mask, exposure_discount):
+def compute_raw_exposure(topk_recs, mask, exposure_discount):
     exposure = np.zeros_like(mask, dtype=np.float32)
     items_ids = np.flatnonzero(mask)
     exp_disc_sum = (1 / exposure_discount).sum()

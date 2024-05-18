@@ -13,7 +13,7 @@ train_neg_sample_args:          # (dict) Negative sampling configuration for mod
   dynamic: False                # (bool) Whether to use dynamic negative sampling.
   candidate_num: 0
 eval_step: 10
-metrics: ['Recall', 'NDCG', 'MRR', 'Hit', 'DeltaNDCG']
+metrics: ['Recall', 'NDCG', 'MRR', 'Hit', 'Precision', 'DeltaNDCG']
 topk: 10
 valid_metric: NDCG@10
 metric_decimal_place: 4
@@ -36,3 +36,7 @@ transform: ~                    # (str) The transform operation for batch data p
 # save_dataloaders: True
 seed: 42
 load_col: {'inter': ['user_id', 'item_id', 'timestamp']}
+
+item_discriminative_attribute: visibility
+short_head_item_discriminative_ratio: 0.2
+item_discriminative_map: ['[PAD]', SH, LT]  # SH: Short Head, LT: Long Tail

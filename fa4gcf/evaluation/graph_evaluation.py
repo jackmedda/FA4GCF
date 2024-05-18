@@ -90,8 +90,8 @@ class GraphMetricsExtractor:
 
                 # item density represents the activity of the users that interact with an item.
                 # If only a user interact with item X and this user interacted with all the items in the catalog, then
-                # the density of X is maximum. A low density then means a high sparsity, which means the users that interact
-                # with that item interact with a few others
+                # the density of X is maximum. A low density then means a high sparsity, which means the users
+                # that interact with that item interact with a few others
                 item_density = np.nan_to_num(
                     ((user_hist_len[_item_hist] / _item_hist.shape[0]).sum(dim=1) / item_pop[1:]).numpy(),
                     nan=0
@@ -124,7 +124,9 @@ class GraphMetricsExtractor:
                 df = pd.DataFrame(zip(range(len(sp_data)), sp_data), columns=[self.node_col, metr])
             elif metr == "Unprotected Preference Index" or metr.upper() == "UPI":
                 if self.upi_kwargs is None:
-                    raise('UPI needs the upi_kwargs to know the sensitive attribute and the disadvantaged group')
+                    raise AttributeError(
+                        'UPI needs the upi_kwargs to know the sensitive attribute and the disadvantaged group'
+                    )
                 else:
                     sens_attrs = self.upi_kwargs.pop('sensitive_attribute')
                     sens_attrs = [sens_attrs] if not isinstance(sens_attrs, Iterable) else sens_attrs
