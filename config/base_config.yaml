@@ -40,3 +40,5 @@ load_col: {'inter': ['user_id', 'item_id', 'timestamp']}
 item_discriminative_attribute: visibility
 short_head_item_discriminative_ratio: 0.2
 item_discriminative_map: ['[PAD]', SH, LT]  # SH: Short Head, LT: Long Tail
+
+fair_metric_statistic: mannwhitneyu

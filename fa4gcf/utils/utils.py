@@ -318,6 +318,10 @@ def get_trainer(model_type, model_name):
                 return getattr(importlib.import_module("fa4gcf.trainer"), "Trainer")
             elif loaded_recbole_trainer is RecboleTraditionalTrainer:
                 return getattr(importlib.import_module("fa4gcf.trainer"), "TraditionalTrainer")
+            elif loaded_recbole_trainer.__name__.lower().startswith(model_name.lower()):
+                # Dynamically replaces FA4GCF Trainer as superclass instead of Recbole Trainer
+                loaded_recbole_trainer.__bases__ = (getattr(importlib.import_module("fa4gcf.trainer"), "Trainer"),)
+                return loaded_recbole_trainer
             else:
                 # Other Trainer types (KG, context-aware) are not supported in FA4GCF
                 warnings.warn(

@@ -1,0 +1,27 @@
+foursquare_nyc:
+  embedding_size: 128
+  learning_rate: 2e-4
+foursquare_tky:
+  embedding_size: 128
+  learning_rate: 2e-4
+ijcai_15_repeat_buyers_80:
+  embedding_size:
+  learning_rate:
+insurance:
+  embedding_size:
+  learning_rate:
+lastfm-1k:
+  embedding_size:
+  learning_rate:
+lastfm-1m:
+  embedding_size: 128
+  learning_rate: 2e-4
+ml-1m:
+  embedding_size: 128
+  learning_rate: 2e-4
+rent_the_runway:
+  embedding_size: 128
+  learning_rate: 2e-4
+tafeng:
+  embedding_size:
+  learning_rate:

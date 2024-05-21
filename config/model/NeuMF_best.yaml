@@ -1,0 +1,54 @@
+foursquare_nyc:
+  dropout_prob: 0.3
+  learning_rate: 2e-4
+  mf_embedding_size: 128
+  mlp_embedding_size: 128
+  mlp_hidden_size: [64,32,16]
+foursquare_tky:
+  dropout_prob: 0.3
+  learning_rate: 2e-4
+  mf_embedding_size: 128
+  mlp_embedding_size: 64
+  mlp_hidden_size: [128,64]
+ijcai_15_repeat_buyers_80:
+  dropout_prob:
+  learning_rate:
+  mf_embedding_size:
+  mlp_embedding_size:
+  mlp_hidden_size:
+insurance:
+  dropout_prob:
+  learning_rate:
+  mf_embedding_size:
+  mlp_embedding_size:
+  mlp_hidden_size:
+lastfm-1k:
+  dropout_prob:
+  learning_rate:
+  mf_embedding_size:
+  mlp_embedding_size:
+  mlp_hidden_size:
+lastfm-1m:
+  dropout_prob: 0.3
+  learning_rate: 2e-4
+  mf_embedding_size: 128
+  mlp_embedding_size: 128
+  mlp_hidden_size: [128,64]
+ml-1m:
+  dropout_prob: 0.3
+  learning_rate: 2e-4
+  mf_embedding_size: 64
+  mlp_embedding_size: 64
+  mlp_hidden_size: [128,64]
+rent_the_runway:
+  dropout_prob: 0.0
+  learning_rate: 2e-4
+  mf_embedding_size: 64
+  mlp_embedding_size: 64
+  mlp_hidden_size: [128,64]
+tafeng:
+  dropout_prob:
+  learning_rate:
+  mf_embedding_size:
+  mlp_embedding_size:
+  mlp_hidden_size:

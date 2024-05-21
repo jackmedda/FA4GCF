@@ -1,3 +1,4 @@
+import scipy
 import numpy as np
 import torch
 from recbole.evaluator.base_metric import AbstractMetric, TopkMetric
@@ -66,6 +67,48 @@ class DeltaPrecision(ConsumerMetric):
         return self.ranking_metric.metric_info(pos_index)
 
 
+class ConsumerMetricStatPValue(ConsumerMetric):
+
+    def __init__(self, config):
+        super(ConsumerMetricStatPValue, self).__init__(config)
+        self.stat = getattr(scipy.stats, config["fair_metric_statistic"])
+
+    def ranking_metric_info(self, pos_index, pos_len):
+        return self.ranking_metric.metric_info(pos_index)
+
+    def calculate_metric(self, dataobject):
+        group_mask1, group_mask2 = self.used_info(dataobject)
+        pos_index, pos_len = self.ranking_metric.used_info(dataobject)
+        result = self.ranking_metric_info(pos_index, pos_len)
+
+        group1_result = result[group_mask1, :]
+        group2_result = result[group_mask2, :]
+
+        final_result = self.stat(group1_result, group2_result).pvalue[None]
+
+        return self.ranking_metric.topk_result(self.__class__.__name__.lower(), final_result)
+
+
+class DeltaNDCGStatPValue(ConsumerMetricStatPValue):
+
+    def __init__(self, config):
+        super(DeltaNDCGStatPValue, self).__init__(config)
+        self.ranking_metric = NDCG(config)
+
+    def ranking_metric_info(self, pos_index, pos_len):
+        return self.ranking_metric.metric_info(pos_index, pos_len)
+
+
+class DeltaPrecisionStatPValue(ConsumerMetric):
+
+    def __init__(self, config):
+        super(DeltaPrecisionStatPValue, self).__init__(config)
+        self.ranking_metric = Precision(config)
+
+    def ranking_metric_info(self, pos_index, pos_len):
+        return self.ranking_metric.metric_info(pos_index)
+
+
 class ProviderMetric(TopkMetric):
     metric_type = EvaluatorType.RANKING
     metric_need = ["eval_data.item_discriminative_feat", "rec.items"]
@@ -98,13 +141,14 @@ class ProviderMetric(TopkMetric):
 
         return sh_group, lt_group, interaction_items
 
-    def get_provider_topk_result(self, sh_result, lt_result):
+    def update_provider_topk_result(self, sh_result, lt_result, metric_dict, k):
         sh_result = (sh_result.sum() / self.group_distribution["SH"]).item()
         lt_result = (lt_result.sum() / self.group_distribution["LT"]).item()
 
         result = compute_DP(sh_result, lt_result)
 
-        return round(result, self.decimal_place)
+        key = "{}@{}".format(self.__class__.__name__.lower(), k)
+        metric_dict[key] = round(result, self.decimal_place)
 
     def calculate_metric(self, dataobject):
         raise NotImplementedError("Use a subclass of ProviderMetric to calculate a specific metric")
@@ -123,8 +167,7 @@ class DeltaExposure(ProviderMetric):
             sh_exposure = compute_raw_exposure(topk_recs, sh_group_mask.numpy(), exposure_discount)
             lt_exposure = compute_raw_exposure(topk_recs, lt_group_mask.numpy(), exposure_discount)
 
-            key = "{}@{}".format("deltaexposure", k)
-            metric_dict[key] = self.get_provider_topk_result(sh_exposure, lt_exposure)
+            self.update_provider_topk_result(sh_exposure, lt_exposure, metric_dict, k)
         return metric_dict
 
 
@@ -143,6 +186,29 @@ class DeltaVisibility(ProviderMetric):
             sh_visibility_prob = visibility_prob[sh_group_mask]
             lt_visibility_prob = visibility_prob[lt_group_mask]
 
-            key = "{}@{}".format("deltavisibility", k)
-            metric_dict[key] = self.get_provider_topk_result(sh_visibility_prob, lt_visibility_prob)
+            self.update_provider_topk_result(sh_visibility_prob, lt_visibility_prob, metric_dict, k)
         return metric_dict
+
+
+class ProviderMetricStatPValue(ProviderMetric):
+
+    def __init__(self, config):
+        super(ProviderMetricStatPValue, self).__init__(config)
+        self.stat = getattr(scipy.stats, config["fair_metric_statistic"])
+
+    def update_provider_topk_result(self, sh_result, lt_result, metric_dict, k):
+        sh_result = sh_result / self.group_distribution["SH"]
+        lt_result = lt_result / self.group_distribution["LT"]
+
+        result = self.stat(sh_result, lt_result).pvalue
+
+        key = "{}@{}".format(self.__class__.__name__.lower(), k)
+        metric_dict[key] = round(result, self.decimal_place)
+
+
+class DeltaExposureStatPValue(ProviderMetricStatPValue, DeltaExposure):
+    pass
+
+
+class DeltaVisibilityStatPValue(ProviderMetricStatPValue, DeltaVisibility):
+    pass

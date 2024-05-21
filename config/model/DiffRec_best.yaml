@@ -1,0 +1,54 @@
+foursquare_nyc:
+  dims_dnn: [1000]
+  learning_rate: 2e-4
+  noise_min: 5e-3
+  noise_scale: 1e-3
+  steps: 5
+foursquare_tky:
+  dims_dnn: [1000]
+  learning_rate: 2e-4
+  noise_min: 5e-4
+  noise_scale: 0.1
+  steps: 5
+ijcai_15_repeat_buyers_80:
+  dims_dnn:
+  learning_rate:
+  noise_min:
+  noise_scale:
+  steps:
+insurance:
+  dims_dnn:
+  learning_rate:
+  noise_min:
+  noise_scale:
+  steps:
+lastfm-1k:
+  dims_dnn:
+  learning_rate:
+  noise_min:
+  noise_scale:
+  steps:
+lastfm-1m:
+  dims_dnn: [1000]
+  learning_rate: 2e-4
+  noise_min: 5e-4
+  noise_scale: 1e-3
+  steps: 10
+ml-1m:
+  dims_dnn: [1000]
+  learning_rate: 2e-4
+  noise_min: 5e-4
+  noise_scale: 1e-3
+  steps: 50
+rent_the_runway:
+  dims_dnn: [200,600]
+  learning_rate: 2e-4
+  noise_min: 5e-4
+  noise_scale: 0.1
+  steps: 5
+tafeng:
+  dims_dnn:
+  learning_rate:
+  noise_min:
+  noise_scale:
+  steps:

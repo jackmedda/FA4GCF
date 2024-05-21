@@ -1,0 +1,45 @@
+foursquare_nyc:
+  dropout_prob: 0.7
+  embedding_size: 128
+  learning_rate: 2e-4
+  negative_weight: 0.5
+foursquare_tky:
+  dropout_prob: 0.7
+  embedding_size: 128
+  learning_rate: 2e-4
+  negative_weight: 0.5
+ijcai_15_repeat_buyers_80:
+  dropout_prob:
+  embedding_size:
+  learning_rate:
+  negative_weight:
+insurance:
+  dropout_prob:
+  embedding_size:
+  learning_rate:
+  negative_weight:
+lastfm-1k:
+  dropout_prob:
+  embedding_size:
+  learning_rate:
+  negative_weight:
+lastfm-1m:
+  dropout_prob: 0.7
+  embedding_size: 128
+  learning_rate: 2e-4
+  negative_weight: 0.5
+ml-1m:
+  dropout_prob: 0.5
+  embedding_size: 64
+  learning_rate: 2e-4
+  negative_weight: 0.5
+rent_the_runway:
+  dropout_prob: 0.3
+  embedding_size: 128
+  learning_rate: 2e-4
+  negative_weight: 0.1
+tafeng:
+  dropout_prob:
+  embedding_size:
+  learning_rate:
+  negative_weight:

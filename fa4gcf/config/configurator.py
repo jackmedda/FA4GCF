@@ -11,6 +11,8 @@ from fa4gcf.utils import get_model
 
 class Config(Recbole_Config):
 
+    DONT_LOAD_MODEL_PARAMS = "DONT_LOAD_MODEL_PARAMS"
+
     def __init__(self, model=None, dataset=None, config_file_list=None, config_dict=None):
         super(Config, self).__init__(
             model=model,
@@ -35,6 +37,9 @@ class Config(Recbole_Config):
         if not isinstance(model, str):
             final_model_class = model
             final_model = model.__name__
+        elif model == self.DONT_LOAD_MODEL_PARAMS:
+            final_model = model
+            final_model_class = get_model("LightGCN")  # used just to get ModelType = GENERAL
         else:
             final_model = model
             final_model_class = get_model(final_model)

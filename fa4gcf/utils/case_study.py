@@ -159,7 +159,7 @@ def pref_data_from_checkpoint(config,
     item_tensor = train_data.dataset.get_item_feature().to(model.device)
 
     model_scores = get_scores(model, batched_data, tot_item_num, item_tensor)
-    _, model_topk_idx = get_top_k(model_scores, topk=10)
+    _, model_topk_idx = get_top_k(model_scores, topk=max(config['topk']))
     model_topk_idx = model_topk_idx.detach().cpu().numpy()
 
     pref_data = pd.DataFrame(zip(user_data.numpy(), model_topk_idx), columns=['user_id', 'cf_topk_pred'])
