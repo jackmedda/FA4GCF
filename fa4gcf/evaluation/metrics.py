@@ -1,9 +1,13 @@
 import scipy
 import numpy as np
 import torch
-from recbole.evaluator.base_metric import AbstractMetric, TopkMetric
-from recbole.evaluator.metrics import NDCG, Precision
 from recbole.utils import EvaluatorType
+from recbole.evaluator.base_metric import AbstractMetric, TopkMetric
+from recbole.evaluator.metrics import (
+    NDCG,
+    Precision,
+    Recall
+)
 
 from fa4gcf.evaluation.recommender_evaluation import compute_DP, compute_raw_exposure
 
@@ -67,6 +71,16 @@ class DeltaPrecision(ConsumerMetric):
         return self.ranking_metric.metric_info(pos_index)
 
 
+class DeltaRecall(ConsumerMetric):
+
+    def __init__(self, config):
+        super(DeltaRecall, self).__init__(config)
+        self.ranking_metric = Recall(config)
+
+    def ranking_metric_info(self, pos_index, pos_len):
+        return self.ranking_metric.metric_info(pos_index, pos_len)
+
+
 class ConsumerMetricStatPValue(ConsumerMetric):
 
     def __init__(self, config):
@@ -107,6 +121,16 @@ class DeltaPrecisionStatPValue(ConsumerMetric):
 
     def ranking_metric_info(self, pos_index, pos_len):
         return self.ranking_metric.metric_info(pos_index)
+
+
+class DeltaRecallStatPValue(ConsumerMetric):
+
+    def __init__(self, config):
+        super(DeltaRecallStatPValue, self).__init__(config)
+        self.ranking_metric = Recall(config)
+
+    def ranking_metric_info(self, pos_index, pos_len):
+        return self.ranking_metric.metric_info(pos_index, pos_len)
 
 
 class ProviderMetric(TopkMetric):
@@ -181,13 +205,35 @@ class DeltaVisibility(ProviderMetric):
         for k in self.topk:
             topk_recs = sorted_recs[:, :k]
             raw_visibility = torch.bincount(topk_recs.flatten(), minlength=n_items)
-            visibility_prob = raw_visibility / (topk_recs.shape[0] * n_items)  # items exposure / (n_users * n_items)
+            visibility_prob = raw_visibility / (topk_recs.shape[0] * k)  # items exposure / (n_users * n_items)
 
             sh_visibility_prob = visibility_prob[sh_group_mask]
             lt_visibility_prob = visibility_prob[lt_group_mask]
 
             self.update_provider_topk_result(sh_visibility_prob, lt_visibility_prob, metric_dict, k)
         return metric_dict
+
+
+class APLT(ProviderMetric):
+
+    def calculate_metric(self, dataobject):
+        sh_group_mask, lt_group_mask, sorted_recs = self.used_info(dataobject)
+
+        metric_dict = {}
+        n_items = sh_group_mask.shape[0]
+        for k in self.topk:
+            topk_recs = sorted_recs[:, :k]
+            raw_visibility = torch.bincount(topk_recs.flatten(), minlength=n_items)
+            visibility_prob = raw_visibility / (topk_recs.shape[0] * k)  # items exposure / (n_users * n_items)
+
+            lt_visibility_prob = visibility_prob[lt_group_mask]
+
+            self.update_provider_topk_result(None, lt_visibility_prob, metric_dict, k)
+        return metric_dict
+
+    def update_provider_topk_result(self, sh_result, lt_result, metric_dict, k):
+        key = "{}@{}".format(self.__class__.__name__.lower(), k)
+        metric_dict[key] = round(lt_result.sum().item(), self.decimal_place)
 
 
 class ProviderMetricStatPValue(ProviderMetric):

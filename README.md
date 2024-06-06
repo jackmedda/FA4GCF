@@ -40,12 +40,12 @@ CUDA version, e.g. 117, 121.
 __NOTE!__: several models rely on the cuda implementations of some operations provided by torch-scatter and
 torch-geometric. We do not guarantee FA4GCF will work on CPU.
 
-# Datasets [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10625046.svg)](https://doi.org/10.5281/zenodo.10625046)
+# Datasets [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.11502634.svg)](https://doi.org/10.5281/zenodo.11502634)
 
 
 The datasets used in our experiments are Foursquare New York City (FNYC),
 Foursquare Tokyo (FKTY), MovieLens 1M (ML1M), Last.FM 1K (LF1K), Rent The Runway (RENT) and
-can be downloaded from [Zenodo](https://zenodo.org/doi/10.5281/zenodo.10625045).
+can be downloaded from [Zenodo](https://zenodo.org/doi/10.5281/zenodo.11502634).
 They should be placed in a folder named _dataset_ in the project root folder,
 so next to the _config_ and _FA4GCF_ folders, e.g.:
 ```
