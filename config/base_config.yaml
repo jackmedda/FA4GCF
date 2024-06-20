@@ -42,3 +42,4 @@ short_head_item_discriminative_ratio: 0.2
 item_discriminative_map: ['[PAD]', SH, LT]  # SH: Short Head, LT: Long Tail
 
 fair_metric_statistic: mannwhitneyu
+recbole_hyper_algo: bayes

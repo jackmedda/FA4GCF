@@ -181,7 +181,7 @@ def recbole_hyper(model, dataset, config_file_list, config_dict, params_file):
     hp = HyperTuning(
         objective_function,
         model_name,
-        algo='exhaustive',
+        algo=base_config['recbole_hyper_algo'],
         params_file=params_file,
         fixed_config_file_list=config_file_list,
         early_stop=10,

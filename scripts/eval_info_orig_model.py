@@ -45,7 +45,7 @@ if __name__ == "__main__":
             os.path.join(current_file, '..', 'config', 'base_config.yaml'),
             os.path.join(current_file, '..', 'config', 'dataset', f'{dset}.yaml')
         ],
-        config_dict={"gpu_id": args.gpu_id}
+        config_dict={"gpu_id": args.gpu_id, "sensitive_attribute": args.sensitive_attribute}
     )
     config["model"] = mod
     config, model, dataset, train_data, valid_data, test_data = utils.load_data_and_model(
@@ -54,6 +54,11 @@ if __name__ == "__main__":
     )
 
     trainer = utils.get_trainer(config['MODEL_TYPE'], config['model'])(config, model)
+    print(
+        "Dataset:", config["dataset"],
+        "Model:", config["model"],
+        "Sensitive attribute:", config["sensitive_attribute"]
+    )
     for split, eval_data in zip(['Test', 'Valid'], [test_data, valid_data]):
         result = trainer.evaluate(eval_data, load_best_model=True, model_file=args.model_file)
         print(split)

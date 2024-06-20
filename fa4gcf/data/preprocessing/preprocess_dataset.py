@@ -105,7 +105,6 @@ if __name__ == "__main__":
         print(df)
         print(df.describe())
         print(df.select(pl.all().n_unique()))
-        exit()
 
     if args.add_token:
         if 'token' not in args.user_field:
