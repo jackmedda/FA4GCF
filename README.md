@@ -158,3 +158,7 @@ By default, the process saves the model in the __AUGMENTED_GRAPH_PATH__ with the
 # Plotting
 
 The scripts inside the folder [scripts](scripts) can be used to plot the results used in the paper.
+
+
+## Acknowledgments
+This project was supported by the project PHaSE - Promoting Healthy and Sustainable Eating through Interactive and Explainable AI Methods, funded by MUR under the PRIN 2022 program (CUP H53D23003530006).
